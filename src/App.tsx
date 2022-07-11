@@ -75,6 +75,12 @@ export const CustomDragLayer = (props: any) => {
   const rootRect = root?.getBoundingClientRect();
   const rect = el?.getBoundingClientRect();
 
+  if (!rect) {
+    return null;
+  }
+
+  // console.log(rect);
+
   // @ts-expect-error
   const initialX = layer.initialSourceClientOffset.x;
   // @ts-expect-error
@@ -90,9 +96,7 @@ export const CustomDragLayer = (props: any) => {
   // @ts-expect-error
   const y = layer.sourceClientOffset.y - rootRect?.top;
 
-  // @ts-expect-error
   const maxDistanceScaleX = rect?.width * 2;
-  // @ts-expect-error
   const maxDistanceScaleY = rect?.height * 2;
 
   const SCALE_MAX = 0.5;
@@ -144,8 +148,15 @@ export const CustomDragLayer = (props: any) => {
   );
 };
 
-function Item(props: ItemConfig & { isActive: boolean }) {
+function Item(
+  props: ItemConfig & {
+    isDragActive: boolean;
+    isInitialAnimationEnabled: boolean;
+  }
+) {
   const randomImageRef = useRef<number>(Math.random());
+
+  console.log(props.isDragActive);
 
   const [dragProps, dragRef, preview] = useDrag(
     () => ({
@@ -163,6 +174,13 @@ function Item(props: ItemConfig & { isActive: boolean }) {
     preview(getEmptyImage(), { captureDraggingState: true });
   }, []);
 
+  const animationVariants = {
+    hidden: { opacity: 0, scaleX: 0 },
+    show: { opacity: 1, scaleX: 1 },
+  };
+
+  const IMAGE_SIZE = props.size === "small" ? 400 : 1200;
+
   return (
     <motion.div
       id={getDraggableId(props.id)}
@@ -170,10 +188,12 @@ function Item(props: ItemConfig & { isActive: boolean }) {
       className={`item card ${props.size}`}
       style={{
         transformOrigin: "top left",
-        // background: props.isActive ? "red" : "white",
       }}
-      initial={false}
-      animate={{ scaleX: 1, opacity: dragProps.opacity }}
+      initial={
+        props.isInitialAnimationEnabled ? animationVariants.hidden : false
+      }
+      animate={props.isDragActive ? "hidden" : "show"}
+      variants={animationVariants}
       transition={{ duration: 0.8, type: "tween", ease: "easeInOut" }}
       draggable={true}
       layout
@@ -181,34 +201,11 @@ function Item(props: ItemConfig & { isActive: boolean }) {
       <div
         className="body"
         style={{
-          backgroundImage: `url(https://picsum.photos/400/400?r=${randomImageRef.current})`,
+          backgroundImage: `url(https://picsum.photos/${IMAGE_SIZE}/${IMAGE_SIZE}?r=${randomImageRef.current})`,
         }}
       />
       <div className="footer">{props.id}</div>
     </motion.div>
-  );
-
-  return (
-    <AnimatePresence>
-      {!dragProps.isDragActive && (
-        <motion.div
-          id={getDraggableId(props.id)}
-          ref={dragRef}
-          className={`item card ${props.size}`}
-          style={{
-            opacity: dragProps.opacity,
-            transformOrigin: "top left",
-            // background: props.isActive ? "red" : "white",
-          }}
-          initial={{ scaleX: 0, opacity: 0 }}
-          animate={{ scaleX: 1, opacity: dragProps.opacity }}
-          // exit={{ scaleX: 0, opacity: 0 }}
-          transition={{ duration: 0.8, type: "spring" }}
-          draggable={true}
-          layout
-        />
-      )}
-    </AnimatePresence>
   );
 }
 
@@ -246,6 +243,8 @@ function Drop(props: ItemConfig) {
 let addedCount = 1;
 function Grid() {
   const [items, setItems] = useState(initialItems);
+  const [isInitialAnimationEnabled, setIsInitialAnimationEnabled] =
+    useState(false);
 
   const layer = useDragLayer((monitor) => {
     return {
@@ -253,6 +252,12 @@ function Grid() {
       item: monitor.getItem(),
     };
   });
+
+  useEffect(() => {
+    if (layer.itemType && isInitialAnimationEnabled === false) {
+      setIsInitialAnimationEnabled(true);
+    }
+  }, [layer.itemType, isInitialAnimationEnabled]);
 
   const add = (size: "small" | "big", position: number) => {
     const updatedItems = [...items];
@@ -274,6 +279,24 @@ function Grid() {
     setItems(updatedItems);
   };
 
+  const makeFirstBigItemSmall = () => {
+    const findIndex = items.findIndex((item) => item.size === "big");
+    if (findIndex !== -1) {
+      const updatedItems = [...items];
+      updatedItems[findIndex].size = "small";
+      setItems(updatedItems);
+    }
+  };
+
+  const makeFirstSmallItemBig = () => {
+    const findIndex = items.findIndex((item) => item.size === "small");
+    if (findIndex !== -1) {
+      const updatedItems = [...items];
+      updatedItems[findIndex].size = "big";
+      setItems(updatedItems);
+    }
+  };
+
   return (
     <>
       <button onClick={() => add("small", 0)}>add small p1</button>
@@ -289,16 +312,28 @@ function Grid() {
       <button onClick={() => remove(4)}>remove p5</button>
       <br />
       <br />
+      <button onClick={() => makeFirstBigItemSmall()}>
+        Make first big item small
+      </button>
+      <button onClick={() => makeFirstSmallItemBig()}>
+        Make first small item big
+      </button>
+      <br />
+      <br />
       <div className="root">
         <CustomDragLayer />
         <div className={`grid ${layer.itemType ? "active" : ""}`}>
           {items.map((item) => {
+            const isDragActive = layer.item && layer.item.id === item.id;
+
             return (
-              <Item
-                key={"item" + item.id}
-                isActive={layer.item && layer.item.id === item.id}
-                {...item}
-              />
+              <AnimatePresence key={"item" + item.id}>
+                <Item
+                  isDragActive={isDragActive}
+                  isInitialAnimationEnabled={isInitialAnimationEnabled}
+                  {...item}
+                />
+              </AnimatePresence>
             );
           })}
         </div>
