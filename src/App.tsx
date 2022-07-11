@@ -2,13 +2,14 @@ import { useEffect, useState } from "react";
 import { HTML5Backend, getEmptyImage } from "react-dnd-html5-backend";
 import { DndProvider, useDrag, useDragLayer, useDrop } from "react-dnd";
 import { motion } from "framer-motion";
-import lerp from "lerp";
 import "./styles.css";
+import { lerp } from "./helpers";
 
 const BIG_DRAGGABLE = "chonk";
 const SMALL_DRAGGABLE = "smol";
 
 type ItemConfig = {
+  id: string;
   index: number;
   size: "small" | "big";
 };
@@ -18,22 +19,24 @@ const BIG_ITEMS_MAX = Math.ceil(NUMBER_OF_ITEMS / 4);
 
 const initialItems = Array.from({ length: NUMBER_OF_ITEMS }).map(
   (_, index): ItemConfig => ({
+    id: index.toString(),
     index: index,
-    size: "small"
+    size: "small",
   })
 );
 
 const makeBig = (index: number) => {
   initialItems[index] = {
+    id: index.toString(),
     index,
-    size: "big"
+    size: "big",
   };
 };
 
 makeBig(0);
 makeBig(7);
 
-export const CustomDragLayer = (props) => {
+export const CustomDragLayer = (props: any) => {
   const dl = useDragLayer((monitor) => {
     return {
       item: monitor.getItem(),
@@ -50,7 +53,7 @@ export const CustomDragLayer = (props) => {
       // TODO: how to explain this one???
       sourceClientOffset: monitor.getSourceClientOffset(),
       isDragging: monitor.isDragging(),
-      diff: monitor.getDifferenceFromInitialOffset()
+      diff: monitor.getDifferenceFromInitialOffset(),
     };
   });
   function renderItem() {
@@ -70,67 +73,53 @@ export const CustomDragLayer = (props) => {
   const root = document.querySelector(".root");
   const el = document.getElementById("hack-" + dl.item.index);
 
-  const BODY_PADDING_Y = 32;
-
   const rootRect = root?.getBoundingClientRect();
   const rect = el?.getBoundingClientRect();
 
   // something is slightly off here
   // source client offset =
+  // @ts-expect-error
   const initialX = dl.initialSourceClientOffset.x;
+  // @ts-expect-error
   const initialY = dl.initialSourceClientOffset.y;
 
+  // @ts-expect-error
   const ox = initialX - dl.initialSourceClientOffset.x;
+  // @ts-expect-error
   const oy = initialY - dl.initialSourceClientOffset.y;
 
-  // const x = dl.initialSourceClientOffset.x + dl.differenceFromInitialOffset.x;
-  // TODO: why is this different from the line above??
-  // const y = dl.initialSourceClientOffset.y + dl.differenceFromInitialOffset.y;
+  // @ts-expect-error
   const x = dl.sourceClientOffset.x - rootRect?.left;
+  // @ts-expect-error
   const y = dl.sourceClientOffset.y - rootRect?.top;
 
-  // const distanceFromTop =
-  //   dl.initialSourceClientOffset.y + dl.initialClientOffset.y;
-
-  // console.log(dl.initialSourceClientOffset.y, distanceFromTop);
-
-  // console.log(dl.initialClientOffset);
-  // console.log(rect, dl.initialSourceClientOffset);
-  // console.log(dl.clientOffset);
-  // console.log(dl.differenceFromInitialOffset);
-  // console.log(dl.sourceClientOffset);
-
+  // @ts-expect-error
   const maxDistanceScaleX = rect?.width * 2;
+  // @ts-expect-error
   const maxDistanceScaleY = rect?.height * 2;
 
   const SCALE_MAX = 0.5;
   const dxp =
+    // @ts-expect-error
     Math.min(maxDistanceScaleX, dl.differenceFromInitialOffset.x) /
     maxDistanceScaleX;
-  // const dxy =
-  //   Math.min(maxDistanceScaleY, dl.differenceFromInitialOffset.y) /
-  //   maxDistanceScaleY;
   const dxy =
+    // @ts-expect-error
     Math.min(maxDistanceScaleY, dl.differenceFromInitialOffset.y) /
     maxDistanceScaleY;
 
-  // this isn't right
   let scale = lerp(1, SCALE_MAX, Math.abs(dxp * dxy));
-  // scale = 1;
 
-  // math is off here
-  // console.log(dxp);
   const ROTATION_LIMIT = 4;
   const rotation =
     dxp > 0
       ? lerp(0, ROTATION_LIMIT, Math.abs(dxp))
       : lerp(0, -ROTATION_LIMIT, Math.abs(dxp));
-  // const rotation = 0;
 
   const transform = [
     `translate(${x}px, ${y}px)`,
     `rotate(${rotation}deg)`,
-    `scale(${scale})`
+    `scale(${scale})`,
   ].join(" ");
 
   const style = {
@@ -147,35 +136,29 @@ export const CustomDragLayer = (props) => {
     transition: "0.2 ease transform",
     transform,
     cursor: "grabbing",
-    boxShadow: "0 0 0 4px black"
+    boxShadow: "0 0 0 4px black",
   };
 
   return (
-    <div
-      className="item card"
-      style={{
-        ...style
-      }}
-    >
+    // @ts-expect-error
+    <div className="item card" style={style}>
       {renderItem()}
     </div>
   );
 };
 
-function Item(props: ItemConfig) {
+function Item(props: any) {
   const [dragProps, dragRef, preview] = useDrag(
     () => ({
       type: props.size === "small" ? SMALL_DRAGGABLE : BIG_DRAGGABLE,
       item: props,
       // isDragging: (m) => m.getItem().index === props.index,
       collect: (monitor) => ({
-        opacity: monitor.isDragging() ? 0.5 : "unset"
-      })
+        opacity: monitor.isDragging() ? 0.5 : "unset",
+      }),
     }),
     []
   );
-
-  console.log(dragProps.isDragging, props.index, props.activeItem);
 
   useEffect(() => {
     preview(getEmptyImage(), { captureDraggingState: true });
@@ -192,8 +175,8 @@ function Item(props: ItemConfig) {
       ref={dragRef}
       className={`item card ${props.size}`}
       style={{
-        opacity: dragProps,
-        transformOrigin: "top left"
+        opacity: dragProps.opacity,
+        transformOrigin: "top left",
       }}
       initial={{ scaleX: 0, opacity: 0 }}
       animate={{ scaleX: 1, opacity: 1 }}
@@ -216,9 +199,9 @@ function Drop(props: ItemConfig) {
 
         return {
           enabled: monitor.canDrop(),
-          opacity: monitor.isOver() ? 1 : a[0] ? 0 : 0
+          opacity: monitor.isOver() ? 1 : a[0] ? 0 : 0,
         };
-      }
+      },
     }),
     []
   );
@@ -232,7 +215,7 @@ function Drop(props: ItemConfig) {
         opacity: props.size === "big" ? dropProps.opacity : dropProps.opacity,
         pointerEvents: dropProps.enabled ? "auto" : "none",
         background: "transparent",
-        transition: "opacity 0.2s ease"
+        transition: "opacity 0.2s ease",
       }}
     />
   );
@@ -244,21 +227,9 @@ function Grid() {
   const layer = useDragLayer((monitor) => {
     return {
       itemType: monitor.getItemType(),
-      item: monitor.getItem()
+      item: monitor.getItem(),
     };
   });
-
-  // useEffect(() => {
-  //   console.log(ddm);
-  // }, []);
-
-  // console.log(ddm);
-  // const monitor = ddm.getMonitor();
-  // console.log(monitor);
-  // const isDraggingBig = monitor.isDraggingSource(BIG_DRAGGABLE);
-  // const isDraggingSmall = monitor.isDraggingSource(SMALL_DRAGGABLE);
-
-  // console.log(isDraggingBig, isDraggingSmall);
 
   return (
     <div className="root">
