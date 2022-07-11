@@ -174,7 +174,7 @@ function Item(props: ItemConfig & { isActive: boolean }) {
       }}
       initial={false}
       animate={{ scaleX: 1, opacity: dragProps.opacity }}
-      transition={{ duration: 0.8, type: "spring" }}
+      transition={{ duration: 0.8, type: "tween", ease: "easeInOut" }}
       draggable={true}
       layout
     >
@@ -270,25 +270,23 @@ function Grid() {
   const remove = (position: number) => {
     console.log(position);
     const updatedItems = [...items];
-    const foo = updatedItems.splice(position, position + 1);
-    console.log(foo);
+    updatedItems.splice(position, position + 1);
     setItems(updatedItems);
   };
 
   return (
     <>
-      <button onClick={() => add("small", 0)}>add small p0</button>
-      <button onClick={() => add("big", 0)}>add big p0</button>
-      <button onClick={() => add("small", 3)}>add small p3</button>
-      <button onClick={() => add("big", 3)}>add big p3</button>
-      <button onClick={() => add("big", 3)}>add big p3</button>
+      <button onClick={() => add("small", 0)}>add small p1</button>
+      <button onClick={() => add("big", 0)}>add big p1</button>
+      <button onClick={() => add("small", 3)}>add small p4</button>
+      <button onClick={() => add("big", 3)}>add big p4</button>
       <br />
       <br />
-      <button onClick={() => remove(0)}>remove p0</button>
-      <button onClick={() => remove(1)}>remove p1</button>
-      <button onClick={() => remove(2)}>remove p2</button>
-      <button onClick={() => remove(3)}>remove p3</button>
-      <button onClick={() => remove(4)}>remove p4</button>
+      <button onClick={() => remove(0)}>remove p1</button>
+      <button onClick={() => remove(1)}>remove p2</button>
+      <button onClick={() => remove(2)}>remove p3</button>
+      <button onClick={() => remove(3)}>remove p4</button>
+      <button onClick={() => remove(4)}>remove p5</button>
       <br />
       <br />
       <div className="root">
