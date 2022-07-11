@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { HTML5Backend, getEmptyImage } from "react-dnd-html5-backend";
 import { DndProvider, useDrag, useDragLayer, useDrop } from "react-dnd";
-import { motion } from "framer-motion";
+import { AnimatePresence, isDragActive, motion } from "framer-motion";
 import "./styles.css";
 import { lerp } from "./helpers";
 
@@ -10,7 +10,6 @@ const SMALL_DRAGGABLE = "smol";
 
 type ItemConfig = {
   id: string;
-  index: number;
   size: "small" | "big";
 };
 
@@ -20,7 +19,6 @@ const BIG_ITEMS_MAX = Math.ceil(NUMBER_OF_ITEMS / 4);
 const initialItems = Array.from({ length: NUMBER_OF_ITEMS }).map(
   (_, index): ItemConfig => ({
     id: index.toString(),
-    index: index,
     size: "small",
   })
 );
@@ -28,7 +26,6 @@ const initialItems = Array.from({ length: NUMBER_OF_ITEMS }).map(
 const makeBig = (index: number) => {
   initialItems[index] = {
     id: index.toString(),
-    index,
     size: "big",
   };
 };
@@ -36,8 +33,10 @@ const makeBig = (index: number) => {
 makeBig(0);
 makeBig(7);
 
+const getDraggableId = (id: string) => `draggable-${id}`;
+
 export const CustomDragLayer = (props: any) => {
-  const dl = useDragLayer((monitor) => {
+  const layer = useDragLayer((monitor) => {
     return {
       item: monitor.getItem(),
       itemType: monitor.getItemType(),
@@ -57,41 +56,39 @@ export const CustomDragLayer = (props: any) => {
     };
   });
   function renderItem() {
-    switch (dl.itemType) {
+    switch (layer.itemType) {
       case BIG_DRAGGABLE:
-        return <div>{dl.item.index}</div>;
+        return <div>Big</div>;
       case SMALL_DRAGGABLE:
-        return <div>{dl.item.index}</div>;
+        return <div>Small</div>;
       default:
         return null;
     }
   }
-  if (!dl.isDragging) {
+  if (!layer.isDragging) {
     return null;
   }
 
   const root = document.querySelector(".root");
-  const el = document.getElementById("hack-" + dl.item.index);
+  const el = document.getElementById(getDraggableId(layer.item.id));
 
   const rootRect = root?.getBoundingClientRect();
   const rect = el?.getBoundingClientRect();
 
-  // something is slightly off here
-  // source client offset =
   // @ts-expect-error
-  const initialX = dl.initialSourceClientOffset.x;
+  const initialX = layer.initialSourceClientOffset.x;
   // @ts-expect-error
-  const initialY = dl.initialSourceClientOffset.y;
+  const initialY = layer.initialSourceClientOffset.y;
 
   // @ts-expect-error
-  const ox = initialX - dl.initialSourceClientOffset.x;
+  const ox = initialX - layer.initialSourceClientOffset.x;
   // @ts-expect-error
-  const oy = initialY - dl.initialSourceClientOffset.y;
+  const oy = initialY - layer.initialSourceClientOffset.y;
 
   // @ts-expect-error
-  const x = dl.sourceClientOffset.x - rootRect?.left;
+  const x = layer.sourceClientOffset.x - rootRect?.left;
   // @ts-expect-error
-  const y = dl.sourceClientOffset.y - rootRect?.top;
+  const y = layer.sourceClientOffset.y - rootRect?.top;
 
   // @ts-expect-error
   const maxDistanceScaleX = rect?.width * 2;
@@ -101,11 +98,11 @@ export const CustomDragLayer = (props: any) => {
   const SCALE_MAX = 0.5;
   const dxp =
     // @ts-expect-error
-    Math.min(maxDistanceScaleX, dl.differenceFromInitialOffset.x) /
+    Math.min(maxDistanceScaleX, layer.differenceFromInitialOffset.x) /
     maxDistanceScaleX;
   const dxy =
     // @ts-expect-error
-    Math.min(maxDistanceScaleY, dl.differenceFromInitialOffset.y) /
+    Math.min(maxDistanceScaleY, layer.differenceFromInitialOffset.y) /
     maxDistanceScaleY;
 
   let scale = lerp(1, SCALE_MAX, Math.abs(dxp * dxy));
@@ -147,14 +144,16 @@ export const CustomDragLayer = (props: any) => {
   );
 };
 
-function Item(props: any) {
+function Item(props: ItemConfig & { isActive: boolean }) {
+  const randomImageRef = useRef<number>(Math.random());
+
   const [dragProps, dragRef, preview] = useDrag(
     () => ({
       type: props.size === "small" ? SMALL_DRAGGABLE : BIG_DRAGGABLE,
       item: props,
-      // isDragging: (m) => m.getItem().index === props.index,
       collect: (monitor) => ({
-        opacity: monitor.isDragging() ? 0.5 : "unset",
+        opacity: monitor.isDragging() ? 0.2 : "unset",
+        isDragActive: monitor.isDragging(),
       }),
     }),
     []
@@ -164,28 +163,52 @@ function Item(props: any) {
     preview(getEmptyImage(), { captureDraggingState: true });
   }, []);
 
-  // use a similar trick here for isDraggingOver.
-  // might need to be two parts for dragging big and dragging small items
-  const isActiveItem =
-    props.activeItem && props.activeItem.index === props.index;
-
   return (
     <motion.div
-      id={`hack-${props.id}`}
+      id={getDraggableId(props.id)}
       ref={dragRef}
       className={`item card ${props.size}`}
       style={{
-        opacity: dragProps.opacity,
         transformOrigin: "top left",
+        // background: props.isActive ? "red" : "white",
       }}
-      initial={{ scaleX: 0, opacity: 0 }}
-      animate={{ scaleX: 1, opacity: 1 }}
+      initial={false}
+      animate={{ scaleX: 1, opacity: dragProps.opacity }}
       transition={{ duration: 0.8, type: "spring" }}
       draggable={true}
       layout
     >
-      {props.index}
+      <div
+        className="body"
+        style={{
+          backgroundImage: `url(https://picsum.photos/400/400?r=${randomImageRef.current})`,
+        }}
+      />
+      <div className="footer">{props.id}</div>
     </motion.div>
+  );
+
+  return (
+    <AnimatePresence>
+      {!dragProps.isDragActive && (
+        <motion.div
+          id={getDraggableId(props.id)}
+          ref={dragRef}
+          className={`item card ${props.size}`}
+          style={{
+            opacity: dragProps.opacity,
+            transformOrigin: "top left",
+            // background: props.isActive ? "red" : "white",
+          }}
+          initial={{ scaleX: 0, opacity: 0 }}
+          animate={{ scaleX: 1, opacity: dragProps.opacity }}
+          // exit={{ scaleX: 0, opacity: 0 }}
+          transition={{ duration: 0.8, type: "spring" }}
+          draggable={true}
+          layout
+        />
+      )}
+    </AnimatePresence>
   );
 }
 
@@ -208,7 +231,6 @@ function Drop(props: ItemConfig) {
 
   return (
     <div
-      id={`hack-${props.index}`}
       ref={dropRef}
       className={`item drop ${props.size}`}
       style={{
@@ -221,6 +243,7 @@ function Drop(props: ItemConfig) {
   );
 }
 
+let addedCount = 1;
 function Grid() {
   const [items, setItems] = useState(initialItems);
 
@@ -231,32 +254,74 @@ function Grid() {
     };
   });
 
+  const add = (size: "small" | "big", position: number) => {
+    const updatedItems = [...items];
+
+    updatedItems.splice(position, 0, {
+      id: "+" + addedCount,
+      size,
+    });
+
+    addedCount++;
+
+    setItems(updatedItems);
+  };
+
+  const remove = (position: number) => {
+    console.log(position);
+    const updatedItems = [...items];
+    const foo = updatedItems.splice(position, position + 1);
+    console.log(foo);
+    setItems(updatedItems);
+  };
+
   return (
-    <div className="root">
-      <CustomDragLayer />
-      <div className={`grid ${layer.itemType ? "active" : ""}`}>
-        {items.map((item) => {
-          return <Item activeItem={layer.item} {...item}></Item>;
-        })}
+    <>
+      <button onClick={() => add("small", 0)}>add small p0</button>
+      <button onClick={() => add("big", 0)}>add big p0</button>
+      <button onClick={() => add("small", 3)}>add small p3</button>
+      <button onClick={() => add("big", 3)}>add big p3</button>
+      <button onClick={() => add("big", 3)}>add big p3</button>
+      <br />
+      <br />
+      <button onClick={() => remove(0)}>remove p0</button>
+      <button onClick={() => remove(1)}>remove p1</button>
+      <button onClick={() => remove(2)}>remove p2</button>
+      <button onClick={() => remove(3)}>remove p3</button>
+      <button onClick={() => remove(4)}>remove p4</button>
+      <br />
+      <br />
+      <div className="root">
+        <CustomDragLayer />
+        <div className={`grid ${layer.itemType ? "active" : ""}`}>
+          {items.map((item) => {
+            return (
+              <Item
+                key={"item" + item.id}
+                isActive={layer.item && layer.item.id === item.id}
+                {...item}
+              />
+            );
+          })}
+        </div>
+        <div className="grid dropzone small">
+          {items.map((item) => {
+            return <Drop key={"drop-small" + item.id} {...item} size="small" />;
+          })}
+        </div>
+        <div className="grid dropzone big">
+          {[...items].splice(0, BIG_ITEMS_MAX).map((item) => {
+            return <Drop key={"drop-big" + item.id} {...item} size="big" />;
+          })}
+        </div>
       </div>
-      <div className="grid dropzone small">
-        {items.map((item) => {
-          return <Drop {...item} size="small" />;
-        })}
-      </div>
-      <div className="grid dropzone big">
-        {[...items].splice(0, BIG_ITEMS_MAX).map((item) => {
-          return <Drop {...item} size="big" />;
-        })}
-      </div>
-    </div>
+    </>
   );
 }
 
 export default function App() {
   return (
     <DndProvider backend={HTML5Backend}>
-      <h1>Remove item example</h1>
       <Grid />
     </DndProvider>
   );
