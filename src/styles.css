@@ -16,6 +16,30 @@ button {
   margin-right: 1rem;
 }
 
+button.close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  margin: 0;
+  color: white;
+  border: none;
+  border-radius: 50%;
+  font-size: 16px;
+  background: rgba(255, 255, 255, 0.2);
+  opacity: 0.9;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 32px;
+}
+
+button.close:hover {
+  background: rgba(255, 255, 255, 0.3);
+  opacity: 1;
+}
+
 .container {
   max-width: 1440px;
     margin: 0 auto;
@@ -90,6 +114,7 @@ button {
 }
 
 .item.card {
+  position: relative;
   cursor: grab;
   border-radius: 8px;
   box-shadow: 0 1px 1px hsl(0deg 0% 0% / 0.075),

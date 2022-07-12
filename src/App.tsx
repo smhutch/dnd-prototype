@@ -9,34 +9,38 @@ import {
 } from "framer-motion";
 import "./styles.css";
 import { lerp } from "./helpers";
+import cuid from "cuid";
+import Chance from "chance";
+
+const chance = new Chance();
 
 const BIG_DRAGGABLE = "chonk";
 const SMALL_DRAGGABLE = "smol";
 
 type ItemConfig = {
   id: string;
+  name: string;
   size: "small" | "big";
 };
 
+const RATIO = [1, 0.2]; // [small, big]
 const NUMBER_OF_ITEMS = 100;
 const BIG_ITEMS_MAX = Math.ceil(NUMBER_OF_ITEMS / 4);
 
+const makeItem = (size: ItemConfig["size"]) => ({
+  id: cuid(),
+  size,
+  name: chance.pickone([
+    chance.name(),
+    chance.animal(),
+    chance.company(),
+    chance.city(),
+  ]),
+});
+
 const initialItems = Array.from({ length: NUMBER_OF_ITEMS }).map(
-  (_, index): ItemConfig => ({
-    id: index.toString(),
-    size: "small",
-  })
+  (_): ItemConfig => makeItem(chance.weighted(["small", "big"], RATIO))
 );
-
-const makeBig = (index: number) => {
-  initialItems[index] = {
-    id: index.toString(),
-    size: "big",
-  };
-};
-
-makeBig(0);
-makeBig(7);
 
 const getDraggableId = (id: string) => `draggable-${id}`;
 
@@ -146,8 +150,11 @@ export const CustomDragLayer = (props: any) => {
   };
 
   return (
-    // @ts-expect-error
-    <div className="item card" style={style}>
+    <div
+      className="item card"
+      // @ts-expect-error
+      style={style}
+    >
       {renderItem()}
     </div>
   );
@@ -155,6 +162,8 @@ export const CustomDragLayer = (props: any) => {
 
 function Item(
   props: ItemConfig & {
+    changeSize(): void;
+    remove(): void;
     isDragActive: boolean;
     isInitialAnimationEnabled: boolean;
   }
@@ -212,20 +221,31 @@ function Item(
         props.isInitialAnimationEnabled ? animationVariants.hidden : false
       }
       // animate={props.isDragActive ? "hidden" : "show"}
-      exit={animationVariants.hidden}
+      exit={{
+        ...animationVariants.hidden,
+        // transformOrigin: "top left",
+      }}
       animate="show"
       variants={animationVariants}
       transition={{ duration: 0.8, type: "tween", ease: "easeInOut" }}
       draggable={true}
+      onDoubleClick={() => props.changeSize()}
       layout
     >
+      <button
+        className="close"
+        aria-label="Close"
+        onClick={() => props.remove()}
+      >
+        <span>×</span>
+      </button>
       <div
         className="body"
         style={{
           backgroundImage: `url(https://picsum.photos/${IMAGE_SIZE}/${IMAGE_SIZE}?r=${randomImageRef.current})`,
         }}
       />
-      <div className="footer">{props.id}</div>
+      <div className="footer">{props.name}</div>
     </motion.div>
   );
 }
@@ -283,36 +303,28 @@ function Grid() {
   const add = (size: "small" | "big", position: number) => {
     const updatedItems = [...items];
 
-    updatedItems.splice(position, 0, {
-      id: "+" + addedCount,
-      size,
-    });
+    updatedItems.splice(position, 0, makeItem(size));
 
     addedCount++;
 
     setItems(updatedItems);
   };
 
-  const remove = (position: number) => {
-    const updatedItems = [...items];
-    updatedItems.splice(position, 1);
-    setItems(updatedItems);
-  };
-
-  const makeFirstBigItemSmall = () => {
-    const findIndex = items.findIndex((item) => item.size === "big");
-    if (findIndex !== -1) {
+  const remove = (id: string) => {
+    const index = items.findIndex((item) => item.id === id);
+    if (index !== -1) {
       const updatedItems = [...items];
-      updatedItems[findIndex].size = "small";
+      updatedItems.splice(index, 1);
       setItems(updatedItems);
     }
   };
 
-  const makeFirstSmallItemBig = () => {
-    const findIndex = items.findIndex((item) => item.size === "small");
-    if (findIndex !== -1) {
+  const changeSize = (id: string) => {
+    const index = items.findIndex((item) => item.id === id);
+    if (index !== -1) {
       const updatedItems = [...items];
-      updatedItems[findIndex].size = "big";
+      const item = updatedItems[index];
+      item.size = item.size === "small" ? "big" : "small";
       setItems(updatedItems);
     }
   };
@@ -326,21 +338,6 @@ function Grid() {
         <button onClick={() => add("big", 0)}>add big p1</button>
         <button onClick={() => add("small", 3)}>add small p4</button>
         <button onClick={() => add("big", 3)}>add big p4</button>
-        <br />
-        <br />
-        <button onClick={() => remove(0)}>remove p1</button>
-        <button onClick={() => remove(1)}>remove p2</button>
-        <button onClick={() => remove(2)}>remove p3</button>
-        <button onClick={() => remove(3)}>remove p4</button>
-        <button onClick={() => remove(4)}>remove p5</button>
-        <br />
-        <br />
-        <button onClick={() => makeFirstBigItemSmall()}>
-          Make first big item small
-        </button>
-        <button onClick={() => makeFirstSmallItemBig()}>
-          Make first small item big
-        </button>
         <br />
         <br />
       </div>
@@ -357,6 +354,8 @@ function Grid() {
                     key={`item-${item.id}`}
                     isDragActive={isDragActive}
                     isInitialAnimationEnabled={isMounted()}
+                    changeSize={() => changeSize(item.id)}
+                    remove={() => remove(item.id)}
                     {...item}
                   />
                 );
