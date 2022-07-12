@@ -23,7 +23,7 @@ type ItemConfig = {
   size: "small" | "big";
 };
 
-const RATIO = [1, 0.2]; // [small, big]
+const RATIO = [1, 0]; // [small, big]
 const NUMBER_OF_ITEMS = 100;
 const BIG_ITEMS_MAX = Math.ceil(NUMBER_OF_ITEMS / 4);
 
