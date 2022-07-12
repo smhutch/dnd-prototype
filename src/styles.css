@@ -115,13 +115,10 @@ button.close:hover {
 .item.drop {
   border-radius: 8px;
   pointer-events: none;
-  /* background: rgba(255, 255, 255, 0.8); */
-  /* z-index: 2; */
-  /* background: blue; */
 }
 
 .item.drop.small {
-  box-shadow: 0 0 0 4px rgba(0, 0, 0, 0.4);
+  /* box-shadow: 0 0 0 4px rgba(0, 0, 0, 0.4); */
 }
 
 .item.drop.big {

@@ -18,10 +18,13 @@ const BIG_DRAGGABLE = "chonk";
 const SMALL_DRAGGABLE = "smol";
 
 const IMAGE_SIZE = 1200;
-const getImageUrl = (name: string) =>
-  `https://picsum.photos/${IMAGE_SIZE}/${IMAGE_SIZE}?r=${name
-    .replace(" ", "-")
-    .replace(".", "")}`;
+const getImageUrl = (name: string) => {
+  const url = `https://picsum.photos/${IMAGE_SIZE}/${IMAGE_SIZE}?r=${name
+    .replace(/ /g, "-")
+    .toLowerCase()}`;
+
+  return url;
+};
 
 type ItemConfig = {
   id: string;
@@ -133,8 +136,9 @@ export const CustomDragLayer = (props: any) => {
     maxDistanceScaleY;
 
   let scale = lerp(1, SCALE_MAX, Math.abs(dxp * dxy));
+  scale = 1;
 
-  const ROTATION_LIMIT = 4;
+  const ROTATION_LIMIT = 2;
   const rotation =
     dxp > 0
       ? lerp(0, ROTATION_LIMIT, Math.abs(dxp))
@@ -151,7 +155,7 @@ export const CustomDragLayer = (props: any) => {
     width: sizes.rect?.width,
     maxWidth: sizes.rect?.width,
     opacity: 1,
-    background: "red",
+    background: "#e5e5e5",
     transform,
   };
 
@@ -197,7 +201,7 @@ function Item(
   const animationVariants = {
     hidden: { opacity: 0, scaleX: 0 },
     show: { opacity: 1, scaleX: 1 },
-    dragging: { opacity: 0.2, scaleX: 0.2 },
+    dragging: { opacity: 0.2, scaleX: 1 },
   };
 
   // if (props.isDragActive) {
@@ -261,8 +265,7 @@ function Drop(props: ItemConfig) {
 
         return {
           enabled: monitor.canDrop(),
-          // opacity: monitor.isOver() ? 1 : a[0] ? 0 : 0,
-          opacity: 1,
+          opacity: monitor.isOver() ? 1 : a[0] ? 0 : 0,
         };
       },
     }),
@@ -281,8 +284,9 @@ function Drop(props: ItemConfig) {
         // opacity: props.size === "big" ? dropProps.opacity : dropProps.opacity,
         opacity: 1,
         pointerEvents: dropProps.enabled ? "auto" : "none",
-        background: "rgba(255,255,255,0.1)",
+        background: "rgba(255,255,255,0.4)",
         transition: "opacity 0.2s ease",
+        // backdropFilter: "blur(10px)",
       }}
     />
   );
