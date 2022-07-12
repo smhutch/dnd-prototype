@@ -1,7 +1,12 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { HTML5Backend, getEmptyImage } from "react-dnd-html5-backend";
 import { DndProvider, useDrag, useDragLayer, useDrop } from "react-dnd";
-import { AnimatePresence, isDragActive, motion } from "framer-motion";
+import {
+  AnimatePresence,
+  isDragActive,
+  LayoutGroup,
+  motion,
+} from "framer-motion";
 import "./styles.css";
 import { lerp } from "./helpers";
 
@@ -156,8 +161,6 @@ function Item(
 ) {
   const randomImageRef = useRef<number>(Math.random());
 
-  console.log(props.isDragActive);
-
   const [dragProps, dragRef, preview] = useDrag(
     () => ({
       type: props.size === "small" ? SMALL_DRAGGABLE : BIG_DRAGGABLE,
@@ -166,6 +169,22 @@ function Item(
         opacity: monitor.isDragging() ? 0.2 : "unset",
         isDragActive: monitor.isDragging(),
       }),
+    }),
+    []
+  );
+
+  const [dropProps, dropRef] = useDrop(
+    () => ({
+      accept: props.size === "small" ? SMALL_DRAGGABLE : BIG_DRAGGABLE,
+      collect: (monitor) => {
+        const a = [monitor.canDrop()];
+        // console.log(a);
+
+        return {
+          enabled: monitor.canDrop(),
+          opacity: monitor.isOver() ? 1 : a[0] ? 0 : 0,
+        };
+      },
     }),
     []
   );
@@ -179,7 +198,7 @@ function Item(
     show: { opacity: 1, scaleX: 1 },
   };
 
-  const IMAGE_SIZE = props.size === "small" ? 400 : 1200;
+  const IMAGE_SIZE = 1200;
 
   return (
     <motion.div
@@ -192,7 +211,9 @@ function Item(
       initial={
         props.isInitialAnimationEnabled ? animationVariants.hidden : false
       }
-      animate={props.isDragActive ? "hidden" : "show"}
+      // animate={props.isDragActive ? "hidden" : "show"}
+      exit={animationVariants.hidden}
+      animate="show"
       variants={animationVariants}
       transition={{ duration: 0.8, type: "tween", ease: "easeInOut" }}
       draggable={true}
@@ -273,9 +294,8 @@ function Grid() {
   };
 
   const remove = (position: number) => {
-    console.log(position);
     const updatedItems = [...items];
-    updatedItems.splice(position, position + 1);
+    updatedItems.splice(position, 1);
     setItems(updatedItems);
   };
 
@@ -297,59 +317,82 @@ function Grid() {
     }
   };
 
+  const isMounted = useIsMounted();
+
   return (
     <>
-      <button onClick={() => add("small", 0)}>add small p1</button>
-      <button onClick={() => add("big", 0)}>add big p1</button>
-      <button onClick={() => add("small", 3)}>add small p4</button>
-      <button onClick={() => add("big", 3)}>add big p4</button>
-      <br />
-      <br />
-      <button onClick={() => remove(0)}>remove p1</button>
-      <button onClick={() => remove(1)}>remove p2</button>
-      <button onClick={() => remove(2)}>remove p3</button>
-      <button onClick={() => remove(3)}>remove p4</button>
-      <button onClick={() => remove(4)}>remove p5</button>
-      <br />
-      <br />
-      <button onClick={() => makeFirstBigItemSmall()}>
-        Make first big item small
-      </button>
-      <button onClick={() => makeFirstSmallItemBig()}>
-        Make first small item big
-      </button>
-      <br />
-      <br />
-      <div className="root">
-        <CustomDragLayer />
-        <div className={`grid ${layer.itemType ? "active" : ""}`}>
-          {items.map((item) => {
-            const isDragActive = layer.item && layer.item.id === item.id;
+      <div className="container">
+        <button onClick={() => add("small", 0)}>add small p1</button>
+        <button onClick={() => add("big", 0)}>add big p1</button>
+        <button onClick={() => add("small", 3)}>add small p4</button>
+        <button onClick={() => add("big", 3)}>add big p4</button>
+        <br />
+        <br />
+        <button onClick={() => remove(0)}>remove p1</button>
+        <button onClick={() => remove(1)}>remove p2</button>
+        <button onClick={() => remove(2)}>remove p3</button>
+        <button onClick={() => remove(3)}>remove p4</button>
+        <button onClick={() => remove(4)}>remove p5</button>
+        <br />
+        <br />
+        <button onClick={() => makeFirstBigItemSmall()}>
+          Make first big item small
+        </button>
+        <button onClick={() => makeFirstSmallItemBig()}>
+          Make first small item big
+        </button>
+        <br />
+        <br />
+      </div>
+      <div className="root container">
+        <LayoutGroup>
+          <CustomDragLayer />
+          <div className={`grid ${layer.itemType ? "active" : ""}`}>
+            <AnimatePresence key={"item"}>
+              {items.map((item) => {
+                const isDragActive = layer.item && layer.item.id === item.id;
 
-            return (
-              <AnimatePresence key={"item" + item.id}>
-                <Item
-                  isDragActive={isDragActive}
-                  isInitialAnimationEnabled={isInitialAnimationEnabled}
-                  {...item}
-                />
-              </AnimatePresence>
-            );
-          })}
-        </div>
-        <div className="grid dropzone small">
-          {items.map((item) => {
-            return <Drop key={"drop-small" + item.id} {...item} size="small" />;
-          })}
-        </div>
-        <div className="grid dropzone big">
-          {[...items].splice(0, BIG_ITEMS_MAX).map((item) => {
-            return <Drop key={"drop-big" + item.id} {...item} size="big" />;
-          })}
-        </div>
+                return (
+                  <Item
+                    key={`item-${item.id}`}
+                    isDragActive={isDragActive}
+                    isInitialAnimationEnabled={isMounted()}
+                    {...item}
+                  />
+                );
+              })}
+            </AnimatePresence>
+          </div>
+          <div className="grid dropzone small">
+            {items.map((item) => {
+              return (
+                <Drop key={"drop-small" + item.id} {...item} size="small" />
+              );
+            })}
+          </div>
+          <div className="grid dropzone big">
+            {[...items].splice(0, BIG_ITEMS_MAX).map((item) => {
+              return <Drop key={"drop-big" + item.id} {...item} size="big" />;
+            })}
+          </div>
+        </LayoutGroup>
       </div>
     </>
   );
+}
+
+function useIsMounted() {
+  const isMounted = useRef(false);
+
+  useEffect(() => {
+    isMounted.current = true;
+
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
+
+  return useCallback(() => isMounted.current, []);
 }
 
 export default function App() {
