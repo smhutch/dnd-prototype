@@ -205,6 +205,7 @@ function Item(
   const animationVariants = {
     hidden: { opacity: 0, scaleX: 0 },
     show: { opacity: 1, scaleX: 1 },
+    dragging: { opacity: 0.2, scaleX: 0.2 },
   };
 
   const IMAGE_SIZE = 1200;
@@ -220,14 +221,15 @@ function Item(
       initial={
         props.isInitialAnimationEnabled ? animationVariants.hidden : false
       }
-      // animate={props.isDragActive ? "hidden" : "show"}
+      animate={props.isDragActive ? "dragging" : "show"}
       exit={{
-        ...animationVariants.hidden,
-        // transformOrigin: "top left",
+        opacity: 0,
+        transition: {
+          duration: 0.2,
+        },
       }}
-      animate="show"
       variants={animationVariants}
-      transition={{ duration: 0.8, type: "tween", ease: "easeInOut" }}
+      transition={{ duration: 0.4, type: "tween", ease: "easeInOut" }}
       draggable={true}
       onDoubleClick={() => props.changeSize()}
       layout
