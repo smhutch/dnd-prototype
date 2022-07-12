@@ -66,10 +66,24 @@ button.close:hover {
   position: absolute;
   inset: 0;
   pointer-events: none;
+  z-index: 2;
 }
 
 .grid.dropzone.big {
   /* border: 1px solid black; */
+}
+
+.item.card.dragger {
+ position: absolute;
+ inset: 0;
+ display: flex;
+ align-items: center;
+ justify-content: center;
+ border-radius: 8px; 
+ cursor: grabbing;
+ /* transition: 0.2s ease transform; */
+ min-height: 350px;
+ z-index: 2;
 }
 
 .item {
@@ -85,6 +99,7 @@ button.close:hover {
   background-repeat: no-repeat;
   background-size: cover;
   background-position: center;
+  width: 100%;
 }
 
 .item .footer {
@@ -100,7 +115,9 @@ button.close:hover {
 .item.drop {
   border-radius: 8px;
   pointer-events: none;
-  background: rgba(255, 255, 255, 0.8);
+  /* background: rgba(255, 255, 255, 0.8); */
+  /* z-index: 2; */
+  /* background: blue; */
 }
 
 .item.drop.small {

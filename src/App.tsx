@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { HTML5Backend, getEmptyImage } from "react-dnd-html5-backend";
 import { DndProvider, useDrag, useDragLayer, useDrop } from "react-dnd";
 import {
@@ -16,6 +16,12 @@ const chance = new Chance();
 
 const BIG_DRAGGABLE = "chonk";
 const SMALL_DRAGGABLE = "smol";
+
+const IMAGE_SIZE = 1200;
+const getImageUrl = (name: string) =>
+  `https://picsum.photos/${IMAGE_SIZE}/${IMAGE_SIZE}?r=${name
+    .replace(" ", "-")
+    .replace(".", "")}`;
 
 type ItemConfig = {
   id: string;
@@ -64,31 +70,39 @@ export const CustomDragLayer = (props: any) => {
       diff: monitor.getDifferenceFromInitialOffset(),
     };
   });
-  function renderItem() {
-    switch (layer.itemType) {
-      case BIG_DRAGGABLE:
-        return <div>Big</div>;
-      case SMALL_DRAGGABLE:
-        return <div>Small</div>;
-      default:
-        return null;
-    }
-  }
-  if (!layer.isDragging) {
-    return null;
-  }
 
-  const root = document.querySelector(".root");
-  const el = document.getElementById(getDraggableId(layer.item.id));
+  const sizes = useMemo(() => {
+    if (!layer.item) return {};
 
-  const rootRect = root?.getBoundingClientRect();
-  const rect = el?.getBoundingClientRect();
+    const root = document.querySelector(".root");
+    const el = document.getElementById(getDraggableId(layer.item.id));
 
-  if (!rect) {
-    return null;
-  }
+    const rootRect = root?.getBoundingClientRect();
+    const rect = el?.getBoundingClientRect();
 
-  // console.log(rect);
+    return {
+      rect,
+      rootRect,
+    };
+  }, [layer.item?.id]);
+
+  if (!layer.isDragging) return null;
+
+  // if (!layer.isDragging) {
+  //   return (
+  //     <div className="item card dragger">
+  //       <div
+  //         className="body"
+  //         style={{
+  //           backgroundImage: `url(${getImageUrl("foo")})`,
+  //         }}
+  //       />
+  //       <div className="footer">{"foo"}</div>
+  //     </div>
+  //   );
+  // }
+
+  if (!sizes.rect) return null;
 
   // @ts-expect-error
   const initialX = layer.initialSourceClientOffset.x;
@@ -101,12 +115,12 @@ export const CustomDragLayer = (props: any) => {
   const oy = initialY - layer.initialSourceClientOffset.y;
 
   // @ts-expect-error
-  const x = layer.sourceClientOffset.x - rootRect?.left;
+  const x = layer.sourceClientOffset.x - sizes.rootRect?.left;
   // @ts-expect-error
-  const y = layer.sourceClientOffset.y - rootRect?.top;
+  const y = layer.sourceClientOffset.y - sizes.rootRect?.top;
 
-  const maxDistanceScaleX = rect?.width * 2;
-  const maxDistanceScaleY = rect?.height * 2;
+  const maxDistanceScaleX = sizes.rect?.width * 2;
+  const maxDistanceScaleY = sizes.rect?.height * 2;
 
   const SCALE_MAX = 0.5;
   const dxp =
@@ -133,29 +147,23 @@ export const CustomDragLayer = (props: any) => {
   ].join(" ");
 
   const style = {
-    height: rect?.height,
-    width: rect?.width,
-    maxWidth: rect?.width,
-    position: "absolute",
-    inset: 0,
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: "8px",
+    height: sizes.rect?.height,
+    width: sizes.rect?.width,
+    maxWidth: sizes.rect?.width,
     opacity: 1,
-    transition: "0.2 ease transform",
+    background: "red",
     transform,
-    cursor: "grabbing",
-    boxShadow: "0 0 0 4px black",
   };
 
   return (
-    <div
-      className="item card"
-      // @ts-expect-error
-      style={style}
-    >
-      {renderItem()}
+    <div className="item card dragger" style={style}>
+      <div
+        className="body"
+        style={{
+          backgroundImage: `url(${getImageUrl(layer.item.name)})`,
+        }}
+      />
+      <div className="footer">{layer.item.name}</div>
     </div>
   );
 };
@@ -182,22 +190,6 @@ function Item(
     []
   );
 
-  const [dropProps, dropRef] = useDrop(
-    () => ({
-      accept: props.size === "small" ? SMALL_DRAGGABLE : BIG_DRAGGABLE,
-      collect: (monitor) => {
-        const a = [monitor.canDrop()];
-        // console.log(a);
-
-        return {
-          enabled: monitor.canDrop(),
-          opacity: monitor.isOver() ? 1 : a[0] ? 0 : 0,
-        };
-      },
-    }),
-    []
-  );
-
   useEffect(() => {
     preview(getEmptyImage(), { captureDraggingState: true });
   }, []);
@@ -208,7 +200,9 @@ function Item(
     dragging: { opacity: 0.2, scaleX: 0.2 },
   };
 
-  const IMAGE_SIZE = 1200;
+  // if (props.isDragActive) {
+  //   return null;
+  // }
 
   return (
     <motion.div
@@ -217,6 +211,11 @@ function Item(
       className={`item card ${props.size}`}
       style={{
         transformOrigin: "top left",
+        ...(props.isDragActive
+          ? {
+              // display: "none",
+            }
+          : {}),
       }}
       initial={
         props.isInitialAnimationEnabled ? animationVariants.hidden : false
@@ -244,7 +243,7 @@ function Item(
       <div
         className="body"
         style={{
-          backgroundImage: `url(https://picsum.photos/${IMAGE_SIZE}/${IMAGE_SIZE}?r=${randomImageRef.current})`,
+          backgroundImage: `url(${getImageUrl(props.name)})`,
         }}
       />
       <div className="footer">{props.name}</div>
@@ -262,28 +261,33 @@ function Drop(props: ItemConfig) {
 
         return {
           enabled: monitor.canDrop(),
-          opacity: monitor.isOver() ? 1 : a[0] ? 0 : 0,
+          // opacity: monitor.isOver() ? 1 : a[0] ? 0 : 0,
+          opacity: 1,
         };
       },
     }),
     []
   );
 
+  if (!dropProps.enabled) {
+    return null;
+  }
+
   return (
     <div
       ref={dropRef}
       className={`item drop ${props.size}`}
       style={{
-        opacity: props.size === "big" ? dropProps.opacity : dropProps.opacity,
+        // opacity: props.size === "big" ? dropProps.opacity : dropProps.opacity,
+        opacity: 1,
         pointerEvents: dropProps.enabled ? "auto" : "none",
-        background: "transparent",
+        background: "rgba(255,255,255,0.1)",
         transition: "opacity 0.2s ease",
       }}
     />
   );
 }
 
-let addedCount = 1;
 function Grid() {
   const [items, setItems] = useState(initialItems);
   const [isInitialAnimationEnabled, setIsInitialAnimationEnabled] =
@@ -304,11 +308,7 @@ function Grid() {
 
   const add = (size: "small" | "big", position: number) => {
     const updatedItems = [...items];
-
     updatedItems.splice(position, 0, makeItem(size));
-
-    addedCount++;
-
     setItems(updatedItems);
   };
 
@@ -344,39 +344,35 @@ function Grid() {
         <br />
       </div>
       <div className="root container">
-        <LayoutGroup>
-          <CustomDragLayer />
-          <div className={`grid ${layer.itemType ? "active" : ""}`}>
-            <AnimatePresence key={"item"}>
-              {items.map((item) => {
-                const isDragActive = layer.item && layer.item.id === item.id;
-
-                return (
-                  <Item
-                    key={`item-${item.id}`}
-                    isDragActive={isDragActive}
-                    isInitialAnimationEnabled={isMounted()}
-                    changeSize={() => changeSize(item.id)}
-                    remove={() => remove(item.id)}
-                    {...item}
-                  />
-                );
-              })}
-            </AnimatePresence>
-          </div>
-          <div className="grid dropzone small">
+        <div className={`grid ${layer.itemType ? "active" : ""}`}>
+          <AnimatePresence key={"item"}>
             {items.map((item) => {
+              const isDragActive = layer.item && layer.item.id === item.id;
+
               return (
-                <Drop key={"drop-small" + item.id} {...item} size="small" />
+                <Item
+                  key={`item-${item.id}`}
+                  isDragActive={isDragActive}
+                  isInitialAnimationEnabled={isMounted()}
+                  changeSize={() => changeSize(item.id)}
+                  remove={() => remove(item.id)}
+                  {...item}
+                />
               );
             })}
-          </div>
-          <div className="grid dropzone big">
-            {[...items].splice(0, BIG_ITEMS_MAX).map((item) => {
-              return <Drop key={"drop-big" + item.id} {...item} size="big" />;
-            })}
-          </div>
-        </LayoutGroup>
+          </AnimatePresence>
+        </div>
+        <div className="grid dropzone small">
+          {items.map((item) => {
+            return <Drop key={"drop-small" + item.id} {...item} size="small" />;
+          })}
+        </div>
+        <div className="grid dropzone big">
+          {[...items].splice(0, BIG_ITEMS_MAX).map((item) => {
+            return <Drop key={"drop-big" + item.id} {...item} size="big" />;
+          })}
+        </div>
+        <CustomDragLayer />
       </div>
     </>
   );
