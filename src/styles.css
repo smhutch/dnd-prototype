@@ -94,10 +94,20 @@ button.close:hover {
   overflow: hidden;
 }
 
+.grid.base .item.card {
+  z-index: 2;
+}
+
+.grid.dropgrid .item {
+  /* outline: 2px solid blue; */
+  z-index: 2;
+}
+
 .item.empty {
   background: #f5f5f5;
   border-radius: 8px;
   z-index: 0;
+  /* z-index: 3; */
 }
 
 .item .body {
@@ -121,6 +131,7 @@ button.close:hover {
 }
 
 .item.drop {
+
 }
 
 .item.drop.small {}
@@ -134,11 +145,6 @@ button.close:hover {
   position: relative;
   cursor: grab;
   border-radius: 8px;
-}
-
-.item.empty {
-  /* background-color: red; */
-  z-index: 3;
 }
 
 .item.card.big {

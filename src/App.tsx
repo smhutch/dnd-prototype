@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  CSSProperties,
+  Fragment,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { HTML5Backend, getEmptyImage } from "react-dnd-html5-backend";
 import { DndProvider, useDrag, useDragLayer, useDrop } from "react-dnd";
 import {
@@ -6,6 +14,7 @@ import {
   isDragActive,
   LayoutGroup,
   motion,
+  MotionTransform,
 } from "framer-motion";
 import { mergeRefs } from "react-merge-refs";
 import "./styles.css";
@@ -74,6 +83,7 @@ export const CustomDragLayer = (props: any) => {
       diff: monitor.getDifferenceFromInitialOffset(),
     };
   });
+  const lastKnownOffset = useRef(layer.initialSourceClientOffset);
 
   const sizes = useMemo(() => {
     if (!layer.item) return {};
@@ -104,7 +114,7 @@ export const CustomDragLayer = (props: any) => {
   //   );
   // }
 
-  const getStyles = () => {
+  const getInlineStyles = (): CSSProperties => {
     if (!sizes.rect) return {};
 
     // @ts-expect-error
@@ -112,10 +122,12 @@ export const CustomDragLayer = (props: any) => {
     // @ts-expect-error
     const initialY = layer.initialSourceClientOffset.y;
 
-    // @ts-expect-error
-    const ox = initialX - layer.initialSourceClientOffset.x;
-    // @ts-expect-error
-    const oy = initialY - layer.initialSourceClientOffset.y;
+    // console.log(initialX, initialY);
+
+    // // @ts-expect-error
+    // const ox = initialX - layer.initialSourceClientOffset.x;
+    // // @ts-expect-error
+    // const oy = initialY - layer.initialSourceClientOffset.y;
 
     // @ts-expect-error
     const x = layer.sourceClientOffset.x - sizes.rootRect?.left;
@@ -147,11 +159,11 @@ export const CustomDragLayer = (props: any) => {
     const transform = [
       `translate(${x}px, ${y}px)`,
       `rotate(${rotation}deg)`,
-      `scale(${scale})`,
+      // `scale(${scale})`,
     ].join(" ");
 
     return {
-      height: sizes.rect?.height,
+      height: sizes.rect?.height ?? 0,
       width: sizes.rect?.width,
       maxWidth: sizes.rect?.width,
       background: "#e5e5e5",
@@ -159,10 +171,71 @@ export const CustomDragLayer = (props: any) => {
     };
   };
 
+  const getPos = () => {
+    if (!sizes.rect) return {};
+
+    // @ts-expect-error
+    const x = layer.sourceClientOffset.x - sizes.rootRect?.left;
+    // @ts-expect-error
+    const y = layer.sourceClientOffset.y - sizes.rootRect?.top;
+
+    return {
+      x,
+      y,
+    };
+  };
+  const styles = getInlineStyles();
+  const pos = getPos();
+
+  // if (layer.isDragging) {
+  //   console.log(
+  //     layer && layer.sourceClientOffset ? layer.sourceClientOffset.x : 0,
+  //     layer && layer.initialSourceClientOffset
+  //       ? layer.initialSourceClientOffset.x
+  //       : 0,
+  //     sizes.rect?.top
+  //   );
+  // }
+
+  useEffect(() => {
+    if (layer.initialSourceClientOffset) {
+      lastKnownOffset.current = {
+        // @ts-expect-error
+        x: layer.initialSourceClientOffset.x - sizes.rootRect?.left,
+        // @ts-expect-error
+        y: layer.initialSourceClientOffset.y - sizes.rootRect?.top,
+      };
+    }
+  }, [layer.initialSourceClientOffset]);
+
   return (
-    <AnimatePresence>
+    <AnimatePresence initial={false}>
       {layer.isDragging && (
-        <div className="item card shadow dragger" style={getStyles()}>
+        <motion.div
+          // exit={{
+          //   x: lastKnownOffset.current?.x || 0,
+          //   y: lastKnownOffset.current?.y || 0,
+          //   transition: {
+          //     duration: 0.8,
+          //     type: "spring",
+          //   },
+          // }}
+          // animate={{
+          //   x: pos.x,
+          //   y: pos.y,
+          // }}
+          // animate={{
+          //   ...(styles as any),
+          //   transition: {
+          //     duration: 0.8,
+          //     type: "spring",
+          //   },
+          // }}
+          style={{
+            ...styles,
+          }}
+          className="item card shadow dragger"
+        >
           <div
             className="body"
             style={{
@@ -170,7 +243,7 @@ export const CustomDragLayer = (props: any) => {
             }}
           />
           <div className="footer">{layer.item.name}</div>
-        </div>
+        </motion.div>
       )}
     </AnimatePresence>
   );
@@ -181,14 +254,17 @@ function Item(
     changeSize(): void;
     remove(): void;
     isDragActive: boolean;
+    isHovered: boolean;
+    onEndDrag(): void;
   }
 ) {
   const [_, dragRef, preview] = useDrag(
     () => ({
       type: props.size === "small" ? SMALL_DRAGGABLE : BIG_DRAGGABLE,
       item: props,
+      end: () => props.onEndDrag(),
     }),
-    []
+    [props.onEndDrag]
   );
 
   useEffect(() => {
@@ -205,6 +281,31 @@ function Item(
     return <motion.div className="item empty"></motion.div>;
   }
 
+  // if (props.isDragActive) {
+  //   if (props.isHovered) {
+  //     return (
+  //       <motion.div
+  //         className="item empty"
+  //         exit={{
+  //           opacity: 0,
+  //           transition: {
+  //             duration: 0.2,
+  //           },
+  //         }}
+  //         style={{ color: "red" }}
+  //       >
+  //         HOVERED
+  //       </motion.div>
+  //     );
+  //   } else {
+  //     return (
+  //       <motion.div className="item empty" style={{ color: "red" }}>
+  //         OUT
+  //       </motion.div>
+  //     );
+  //   }
+  // }
+
   return (
     <motion.div
       id={getDraggableId(props.id)}
@@ -212,11 +313,6 @@ function Item(
       className={`item card shadow ${props.size}`}
       style={{
         transformOrigin: "top left",
-        ...(props.isDragActive
-          ? {
-              display: "none",
-            }
-          : {}),
       }}
       initial={animationVariants.hidden}
       animate={props.isDragActive ? "dragging" : "show"}
@@ -227,7 +323,7 @@ function Item(
         },
       }}
       variants={animationVariants}
-      transition={{ duration: 0.4, type: "tween", ease: "easeInOut" }}
+      transition={{ duration: 0.6, type: "spring" }}
       draggable={true}
       onDoubleClick={() => props.changeSize()}
       layout
@@ -250,7 +346,7 @@ function Item(
   );
 }
 
-function Drop(props: ItemConfig) {
+function Drop(props: ItemConfig & { onHover(id: string): void }) {
   const [dropProps, dropRef] = useDrop(
     () => ({
       accept: props.size === "small" ? SMALL_DRAGGABLE : BIG_DRAGGABLE,
@@ -259,11 +355,14 @@ function Drop(props: ItemConfig) {
           over: monitor.isOver(),
         };
       },
+      hover: () => {
+        props.onHover(props.id as string);
+      },
       drop: () => {
-        alert("dropped");
+        // alert("dropped");
       },
     }),
-    []
+    [props.onHover]
   );
 
   // console.log(dropProps);
@@ -278,7 +377,7 @@ function Drop(props: ItemConfig) {
         // opacity: props.size === "big" ? dropProps.opacity : dropProps.opacity,
         // opacity: dropProps.opacity,
         // pointerEvents: dropProps.over ? "auto" : "none",
-        background: dropProps.over ? "rgba(255,255,0,0.4)" : "transparent",
+        // background: dropProps.over ? "rgba(255,255,0,0.4)" : "transparent",
         // background: "red",
         transition: "opacity 0.2s ease",
       }}
@@ -288,6 +387,7 @@ function Drop(props: ItemConfig) {
 
 function Grid() {
   const [items, setItems] = useState(initialItems);
+  const [hoveredId, setHoveredId] = useState<ItemConfig["id"] | null>(null);
   const [isInitialAnimationEnabled, setIsInitialAnimationEnabled] =
     useState(false);
 
@@ -312,7 +412,7 @@ function Grid() {
 
   const remove = (id: string) => {
     const index = items.findIndex((item) => item.id === id);
-    console.log({ id, index });
+    // console.log({ id, index });
     if (index !== -1) {
       const updatedItems = [...items];
       updatedItems.splice(index, 1);
@@ -330,8 +430,6 @@ function Grid() {
     }
   };
 
-  const isMounted = useIsMounted();
-
   const isDragging = Boolean(layer.item);
 
   return (
@@ -345,19 +443,41 @@ function Grid() {
         <br />
       </div>
       <div className="root container">
-        <div className={`grid ${layer.itemType ? "active" : ""}`}>
+        <div className={`grid base ${layer.itemType ? "active" : ""}`}>
           <AnimatePresence key={"item"} initial={false}>
             {items.map((item) => {
               const isDragActive = layer.item && layer.item.id === item.id;
+              const isHovered = hoveredId === item.id;
 
               return (
-                <Item
-                  key={`item-${item.id}`}
-                  isDragActive={isDragActive}
-                  changeSize={() => changeSize(item.id)}
-                  remove={() => remove(item.id)}
-                  {...item}
-                />
+                <Fragment key={`item-${item.id}`}>
+                  {!isDragActive && isHovered && (
+                    <motion.div
+                      className="item empty"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      transition={{
+                        duration: 0.6,
+                        type: "spring",
+                        // ease: "easeInOut",
+                      }}
+                      style={
+                        {
+                          // background: "red",
+                        }
+                      }
+                    ></motion.div>
+                  )}
+                  <Item
+                    isDragActive={isDragActive}
+                    onEndDrag={() => setHoveredId(null)}
+                    isHovered={isHovered}
+                    changeSize={() => changeSize(item.id)}
+                    remove={() => remove(item.id)}
+                    {...item}
+                  />
+                </Fragment>
               );
             })}
           </AnimatePresence>
@@ -366,7 +486,12 @@ function Grid() {
           <div className="grid dropgrid small">
             {items.map((item) => {
               return (
-                <Drop key={"drop-small" + item.id} {...item} size="small" />
+                <Drop
+                  key={"drop-small" + item.id}
+                  {...item}
+                  size="small"
+                  onHover={setHoveredId}
+                />
               );
             })}
           </div>
@@ -429,20 +554,6 @@ function Toolbar(props: { isDragActive: boolean; remove(id: string): void }) {
       )}
     </AnimatePresence>
   );
-}
-
-function useIsMounted() {
-  const isMounted = useRef(false);
-
-  useEffect(() => {
-    isMounted.current = true;
-
-    return () => {
-      isMounted.current = false;
-    };
-  }, []);
-
-  return useCallback(() => isMounted.current, []);
 }
 
 export default function App() {
