@@ -34,7 +34,7 @@ type ItemConfig = {
 };
 
 const RATIO = [1, 0]; // [small, big]
-const NUMBER_OF_ITEMS = 100;
+const NUMBER_OF_ITEMS = 12;
 const BIG_ITEMS_MAX = Math.ceil(NUMBER_OF_ITEMS / 4);
 
 const makeItem = (size: ItemConfig["size"]) => ({
@@ -122,8 +122,8 @@ export const CustomDragLayer = (props: any) => {
     // @ts-expect-error
     const y = layer.sourceClientOffset.y - sizes.rootRect?.top;
 
-    const maxDistanceScaleX = sizes.rect?.width * 2;
-    const maxDistanceScaleY = sizes.rect?.height * 2;
+    const maxDistanceScaleX = sizes.rect?.width * 0.8;
+    const maxDistanceScaleY = sizes.rect?.height * 0.8;
 
     const SCALE_MAX = 0.5;
     const dxp =
@@ -138,11 +138,11 @@ export const CustomDragLayer = (props: any) => {
     let scale = lerp(1, SCALE_MAX, Math.abs(dxp * dxy));
     scale = 1;
 
-    const ROTATION_LIMIT = 2;
+    const ROTATE_MAX = 3;
     const rotation =
       dxp > 0
-        ? lerp(0, ROTATION_LIMIT, Math.abs(dxp))
-        : lerp(0, -ROTATION_LIMIT, Math.abs(dxp));
+        ? lerp(0, ROTATE_MAX, Math.abs(dxp))
+        : lerp(0, -ROTATE_MAX, Math.abs(dxp));
 
     const transform = [
       `translate(${x}px, ${y}px)`,
@@ -200,6 +200,10 @@ function Item(
     show: { opacity: 1, scaleX: 1 },
     dragging: { opacity: 0.2, scaleX: 1 },
   };
+
+  if (props.isDragActive) {
+    return <motion.div className="item empty"></motion.div>;
+  }
 
   return (
     <motion.div
@@ -308,6 +312,7 @@ function Grid() {
 
   const remove = (id: string) => {
     const index = items.findIndex((item) => item.id === id);
+    console.log({ id, index });
     if (index !== -1) {
       const updatedItems = [...items];
       updatedItems.splice(index, 1);
@@ -391,7 +396,7 @@ function Toolbar(props: { isDragActive: boolean; remove(id: string): void }) {
         props.remove(item.id);
       },
     }),
-    []
+    [props.remove]
   );
 
   return (
