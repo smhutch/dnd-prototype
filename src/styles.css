@@ -49,6 +49,12 @@ button.close:hover {
   position: relative;
 } 
 
+.shadow {
+    box-shadow: 0 1px 1px hsl(0deg 0% 0% / 0.075),
+        0 2px 2px hsl(0deg 0% 0% / 0.075), 0 4px 4px hsl(0deg 0% 0% / 0.075),
+        0 8px 8px hsl(0deg 0% 0% / 0.075);
+}
+
 .grid {
   display: grid;
   grid-template-columns: 1fr 1fr 1fr 1fr;
@@ -62,34 +68,33 @@ button.close:hover {
   /* opacity: 0; */
 }
 
-.grid.dropzone {
+.grid.dropgrid {
   position: absolute;
   inset: 0;
-  pointer-events: none;
-  z-index: 2;
-}
-
-.grid.dropzone.big {
-  /* border: 1px solid black; */
 }
 
 .item.card.dragger {
  position: absolute;
  inset: 0;
  display: flex;
- align-items: center;
- justify-content: center;
  border-radius: 8px; 
  cursor: grabbing;
- /* transition: 0.2s ease transform; */
- min-height: 350px;
- z-index: 2;
+ width: 100%;
+box-shadow: 0 1px 1px hsl(0deg 0% 0% / 0.075),
+    0 2px 2px hsl(0deg 0% 0% / 0.075), 0 4px 4px hsl(0deg 0% 0% / 0.075),
+    0 8px 8px hsl(0deg 0% 0% / 0.075), 0 16px 16px hsl(0deg 0% 0% / 0.075), 0 32px 32px hsl(0deg 0% 0% / 0.075);
 }
+
 
 .item {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+
+.item.empty {
+  background: #e5e5e5;
+  border-radius: 8px;
 }
 
 .item .body {
@@ -113,8 +118,10 @@ button.close:hover {
 }
 
 .item.drop {
-  border-radius: 8px;
-  pointer-events: none;
+  /* border-radius: 8px; */
+  /* pointer-events: none; */
+  /* background: red; */
+  /* outline: 4px solid black; */
 }
 
 .item.drop.small {
@@ -122,7 +129,7 @@ button.close:hover {
 }
 
 .item.drop.big {
-  box-shadow: 0 0 0 4px rgba(0, 0, 0, 0.4);
+  /* box-shadow: 0 0 0 4px rgba(0, 0, 0, 0.4); */
   grid-column: span 2;
   grid-row: span 2;
 }
@@ -131,12 +138,44 @@ button.close:hover {
   position: relative;
   cursor: grab;
   border-radius: 8px;
-  box-shadow: 0 1px 1px hsl(0deg 0% 0% / 0.075),
-    0 2px 2px hsl(0deg 0% 0% / 0.075), 0 4px 4px hsl(0deg 0% 0% / 0.075),
-    0 8px 8px hsl(0deg 0% 0% / 0.075);
+}
+
+.item.empty {
+  /* background-color: red; */
+  z-index: 3;
 }
 
 .item.card.big {
   grid-column: span 2;
   grid-row: span 2;
+}
+
+.toolbar-container {
+  position: fixed;
+  bottom: 32px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2;
+}
+
+.toolbar {
+  display: inline-flex;
+  background: white;
+  border-radius: 16px;
+  padding: 8px;
+  font-size: 1rem;
+  gap: 8px;
+  margin-bottom: 16px;
+  margin: 0 auto;
+}
+
+.toolbar .item {
+  background-color: #e5e5e5;
+  padding: 16px 32px;
+  border-radius: 8px;
+  /* width: 150px;
+  height: 150px; */
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }

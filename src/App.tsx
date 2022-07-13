@@ -7,6 +7,7 @@ import {
   LayoutGroup,
   motion,
 } from "framer-motion";
+import { mergeRefs } from "react-merge-refs";
 import "./styles.css";
 import { lerp } from "./helpers";
 import cuid from "cuid";
@@ -89,8 +90,6 @@ export const CustomDragLayer = (props: any) => {
     };
   }, [layer.item?.id]);
 
-  if (!layer.isDragging) return null;
-
   // if (!layer.isDragging) {
   //   return (
   //     <div className="item card dragger">
@@ -105,70 +104,75 @@ export const CustomDragLayer = (props: any) => {
   //   );
   // }
 
-  if (!sizes.rect) return null;
+  const getStyles = () => {
+    if (!sizes.rect) return {};
 
-  // @ts-expect-error
-  const initialX = layer.initialSourceClientOffset.x;
-  // @ts-expect-error
-  const initialY = layer.initialSourceClientOffset.y;
-
-  // @ts-expect-error
-  const ox = initialX - layer.initialSourceClientOffset.x;
-  // @ts-expect-error
-  const oy = initialY - layer.initialSourceClientOffset.y;
-
-  // @ts-expect-error
-  const x = layer.sourceClientOffset.x - sizes.rootRect?.left;
-  // @ts-expect-error
-  const y = layer.sourceClientOffset.y - sizes.rootRect?.top;
-
-  const maxDistanceScaleX = sizes.rect?.width * 2;
-  const maxDistanceScaleY = sizes.rect?.height * 2;
-
-  const SCALE_MAX = 0.5;
-  const dxp =
     // @ts-expect-error
-    Math.min(maxDistanceScaleX, layer.differenceFromInitialOffset.x) /
-    maxDistanceScaleX;
-  const dxy =
+    const initialX = layer.initialSourceClientOffset.x;
     // @ts-expect-error
-    Math.min(maxDistanceScaleY, layer.differenceFromInitialOffset.y) /
-    maxDistanceScaleY;
+    const initialY = layer.initialSourceClientOffset.y;
 
-  let scale = lerp(1, SCALE_MAX, Math.abs(dxp * dxy));
-  scale = 1;
+    // @ts-expect-error
+    const ox = initialX - layer.initialSourceClientOffset.x;
+    // @ts-expect-error
+    const oy = initialY - layer.initialSourceClientOffset.y;
 
-  const ROTATION_LIMIT = 2;
-  const rotation =
-    dxp > 0
-      ? lerp(0, ROTATION_LIMIT, Math.abs(dxp))
-      : lerp(0, -ROTATION_LIMIT, Math.abs(dxp));
+    // @ts-expect-error
+    const x = layer.sourceClientOffset.x - sizes.rootRect?.left;
+    // @ts-expect-error
+    const y = layer.sourceClientOffset.y - sizes.rootRect?.top;
 
-  const transform = [
-    `translate(${x}px, ${y}px)`,
-    `rotate(${rotation}deg)`,
-    `scale(${scale})`,
-  ].join(" ");
+    const maxDistanceScaleX = sizes.rect?.width * 2;
+    const maxDistanceScaleY = sizes.rect?.height * 2;
 
-  const style = {
-    height: sizes.rect?.height,
-    width: sizes.rect?.width,
-    maxWidth: sizes.rect?.width,
-    opacity: 1,
-    background: "#e5e5e5",
-    transform,
+    const SCALE_MAX = 0.5;
+    const dxp =
+      // @ts-expect-error
+      Math.min(maxDistanceScaleX, layer.differenceFromInitialOffset.x) /
+      maxDistanceScaleX;
+    const dxy =
+      // @ts-expect-error
+      Math.min(maxDistanceScaleY, layer.differenceFromInitialOffset.y) /
+      maxDistanceScaleY;
+
+    let scale = lerp(1, SCALE_MAX, Math.abs(dxp * dxy));
+    scale = 1;
+
+    const ROTATION_LIMIT = 2;
+    const rotation =
+      dxp > 0
+        ? lerp(0, ROTATION_LIMIT, Math.abs(dxp))
+        : lerp(0, -ROTATION_LIMIT, Math.abs(dxp));
+
+    const transform = [
+      `translate(${x}px, ${y}px)`,
+      `rotate(${rotation}deg)`,
+      `scale(${scale})`,
+    ].join(" ");
+
+    return {
+      height: sizes.rect?.height,
+      width: sizes.rect?.width,
+      maxWidth: sizes.rect?.width,
+      background: "#e5e5e5",
+      transform,
+    };
   };
 
   return (
-    <div className="item card dragger" style={style}>
-      <div
-        className="body"
-        style={{
-          backgroundImage: `url(${getImageUrl(layer.item.name)})`,
-        }}
-      />
-      <div className="footer">{layer.item.name}</div>
-    </div>
+    <AnimatePresence>
+      {layer.isDragging && (
+        <div className="item card shadow dragger" style={getStyles()}>
+          <div
+            className="body"
+            style={{
+              backgroundImage: `url(${getImageUrl(layer.item.name)})`,
+            }}
+          />
+          <div className="footer">{layer.item.name}</div>
+        </div>
+      )}
+    </AnimatePresence>
   );
 };
 
@@ -177,19 +181,12 @@ function Item(
     changeSize(): void;
     remove(): void;
     isDragActive: boolean;
-    isInitialAnimationEnabled: boolean;
   }
 ) {
-  const randomImageRef = useRef<number>(Math.random());
-
-  const [dragProps, dragRef, preview] = useDrag(
+  const [_, dragRef, preview] = useDrag(
     () => ({
       type: props.size === "small" ? SMALL_DRAGGABLE : BIG_DRAGGABLE,
       item: props,
-      collect: (monitor) => ({
-        opacity: monitor.isDragging() ? 0.2 : "unset",
-        isDragActive: monitor.isDragging(),
-      }),
     }),
     []
   );
@@ -204,26 +201,20 @@ function Item(
     dragging: { opacity: 0.2, scaleX: 1 },
   };
 
-  // if (props.isDragActive) {
-  //   return null;
-  // }
-
   return (
     <motion.div
       id={getDraggableId(props.id)}
       ref={dragRef}
-      className={`item card ${props.size}`}
+      className={`item card shadow ${props.size}`}
       style={{
         transformOrigin: "top left",
         ...(props.isDragActive
           ? {
-              // display: "none",
+              display: "none",
             }
           : {}),
       }}
-      initial={
-        props.isInitialAnimationEnabled ? animationVariants.hidden : false
-      }
+      initial={animationVariants.hidden}
       animate={props.isDragActive ? "dragging" : "show"}
       exit={{
         opacity: 0,
@@ -250,7 +241,7 @@ function Item(
           backgroundImage: `url(${getImageUrl(props.name)})`,
         }}
       />
-      <div className="footer">{props.name}</div>
+      <motion.div className="footer">{props.name}</motion.div>
     </motion.div>
   );
 }
@@ -260,21 +251,20 @@ function Drop(props: ItemConfig) {
     () => ({
       accept: props.size === "small" ? SMALL_DRAGGABLE : BIG_DRAGGABLE,
       collect: (monitor) => {
-        const a = [monitor.canDrop()];
-        // console.log(a);
-
         return {
-          enabled: monitor.canDrop(),
-          opacity: monitor.isOver() ? 1 : a[0] ? 0 : 0,
+          over: monitor.isOver(),
         };
+      },
+      drop: () => {
+        alert("dropped");
       },
     }),
     []
   );
 
-  if (!dropProps.enabled) {
-    return null;
-  }
+  // console.log(dropProps);
+
+  // console.log(dropProps.over, dropProps.foo);
 
   return (
     <div
@@ -282,11 +272,11 @@ function Drop(props: ItemConfig) {
       className={`item drop ${props.size}`}
       style={{
         // opacity: props.size === "big" ? dropProps.opacity : dropProps.opacity,
-        opacity: 1,
-        pointerEvents: dropProps.enabled ? "auto" : "none",
-        background: "rgba(255,255,255,0.4)",
+        // opacity: dropProps.opacity,
+        // pointerEvents: dropProps.over ? "auto" : "none",
+        background: dropProps.over ? "rgba(255,255,0,0.4)" : "transparent",
+        // background: "red",
         transition: "opacity 0.2s ease",
-        // backdropFilter: "blur(10px)",
       }}
     />
   );
@@ -337,6 +327,8 @@ function Grid() {
 
   const isMounted = useIsMounted();
 
+  const isDragging = Boolean(layer.item);
+
   return (
     <>
       <div className="container">
@@ -349,7 +341,7 @@ function Grid() {
       </div>
       <div className="root container">
         <div className={`grid ${layer.itemType ? "active" : ""}`}>
-          <AnimatePresence key={"item"}>
+          <AnimatePresence key={"item"} initial={false}>
             {items.map((item) => {
               const isDragActive = layer.item && layer.item.id === item.id;
 
@@ -357,7 +349,6 @@ function Grid() {
                 <Item
                   key={`item-${item.id}`}
                   isDragActive={isDragActive}
-                  isInitialAnimationEnabled={isMounted()}
                   changeSize={() => changeSize(item.id)}
                   remove={() => remove(item.id)}
                   {...item}
@@ -366,19 +357,72 @@ function Grid() {
             })}
           </AnimatePresence>
         </div>
-        <div className="grid dropzone small">
-          {items.map((item) => {
-            return <Drop key={"drop-small" + item.id} {...item} size="small" />;
-          })}
-        </div>
-        <div className="grid dropzone big">
+        {isDragging && (
+          <div className="grid dropgrid small">
+            {items.map((item) => {
+              return (
+                <Drop key={"drop-small" + item.id} {...item} size="small" />
+              );
+            })}
+          </div>
+        )}
+        {/* <div className="grid dropgrid big">
           {[...items].splice(0, BIG_ITEMS_MAX).map((item) => {
             return <Drop key={"drop-big" + item.id} {...item} size="big" />;
           })}
-        </div>
+        </div> */}
         <CustomDragLayer />
+        <Toolbar isDragActive={Boolean(layer.item)} remove={remove} />
       </div>
     </>
+  );
+}
+
+function Toolbar(props: { isDragActive: boolean; remove(id: string): void }) {
+  const [dropProps, dropRef] = useDrop(
+    () => ({
+      accept: [SMALL_DRAGGABLE],
+      collect: (monitor) => {
+        return {
+          over: monitor.isOver(),
+        };
+      },
+      drop: (item: ItemConfig) => {
+        props.remove(item.id);
+      },
+    }),
+    []
+  );
+
+  return (
+    <AnimatePresence>
+      {props.isDragActive && (
+        <div className="toolbar-container">
+          <motion.div
+            initial={"hidden"}
+            animate="visible"
+            variants={{
+              visible: { opacity: 1, y: 0 },
+              hidden: { opacity: 0, y: 120 },
+            }}
+            className="toolbar shadow"
+            style={{
+              backdropFilter: "blur(10px)",
+            }}
+          >
+            <div
+              ref={dropRef}
+              className="item"
+              style={{
+                background: `rgba(0,0,0,${dropProps.over ? 0.1 : 0.05})`,
+              }}
+            >
+              Drop here to remove
+            </div>
+          </motion.div>
+        </div>
+      )}
+    </AnimatePresence>
   );
 }
 
