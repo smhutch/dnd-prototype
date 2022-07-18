@@ -70,6 +70,7 @@ button.close:hover {
 
 .grid.dropgrid {
   position: absolute;
+  pointer-events: none;
   inset: 0;
 }
 
@@ -78,7 +79,7 @@ button.close:hover {
  inset: 0;
  display: flex;
  border-radius: 8px; 
- cursor: grabbing;
+ cursor: grabbing!important;
  pointer-events: none;
  width: 100%;
   box-shadow: 0 1px 1px hsl(0deg 0% 0% / 0.075),
@@ -180,4 +181,13 @@ button.close:hover {
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+/* debug */
+.grid.dropgrid {
+  /* background: red; */
+}
+
+.grid.dropgrid .item {
+  /* background: blue; */
 }
