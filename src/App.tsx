@@ -29,39 +29,51 @@ const BIG_DRAGGABLE = "chonk";
 const SMALL_DRAGGABLE = "smol";
 
 const IMAGE_SIZE = 1200;
-const getImageUrl = (id: string) => {
-  const url = `https://picsum.photos/${IMAGE_SIZE}/${IMAGE_SIZE}?r=${id
-    .replace(/ /g, "-")
-    .toLowerCase()}`;
+
+let imageId = 1;
+const getImageUrl = () => {
+  const url = `/artwork/${imageId}.jpg`;
+  imageId++;
 
   return url;
 };
 
 type ItemConfig = {
   id: string;
-  name: string;
+  imageUrl: string;
+  username: string;
   size: "small" | "big";
 };
 
 const RATIO = [1, 0]; // [small, big]
-const NUMBER_OF_ITEMS = 48;
+const NUMBER_OF_ITEMS = 24;
 
-const makeItem = (size: ItemConfig["size"]) => ({
+const makeItem = (size: ItemConfig["size"]): ItemConfig => ({
   id: cuid(),
+  imageUrl: getImageUrl(),
   size,
-  name: chance.pickone([
-    chance.name(),
-    chance.animal(),
-    chance.company(),
-    chance.city(),
-  ]),
+  username: "@adam",
 });
 
-const initialItems = Array.from({ length: NUMBER_OF_ITEMS }).map(
-  (_): ItemConfig => makeItem(chance.weighted(["small", "big"], RATIO))
-);
+const initialItems = Array.from({ length: NUMBER_OF_ITEMS })
+  .map((_): ItemConfig => makeItem(chance.weighted(["small", "big"], RATIO)))
+  .reverse();
 
 const getDraggableId = (id: string) => `draggable-${id}`;
+
+const Avatar = () => {
+  return (
+    <img
+      src="/avatar.jpg"
+      style={{
+        width: 24,
+        height: 24,
+        borderRadius: 999,
+        marginRight: 16,
+      }}
+    />
+  );
+};
 
 export const CustomDragLayer = (props: any) => {
   const layer = useDragLayer((monitor) => {
@@ -224,10 +236,13 @@ export const CustomDragLayer = (props: any) => {
           <div
             className="body"
             style={{
-              backgroundImage: `url(${getImageUrl(layer.item.name)})`,
+              backgroundImage: `url(${layer.item.imageUrl})`,
             }}
           />
-          <div className="footer">{layer.item.name}</div>
+          <div className="footer">
+            <Avatar />
+            {layer.item.username}
+          </div>
         </motion.div>
       )}
     </AnimatePresence>
@@ -253,7 +268,8 @@ function Item(
       type: props.size === "small" ? SMALL_DRAGGABLE : BIG_DRAGGABLE,
       item: {
         id: props.id,
-        name: props.name,
+        imageUrl: props.imageUrl,
+        username: props.username,
       },
       end: () => props.onEndDrag(),
     }),
@@ -340,10 +356,13 @@ function Item(
       <div
         className="body"
         style={{
-          backgroundImage: `url(${getImageUrl(props.name)})`,
+          backgroundImage: `url(${props.imageUrl})`,
         }}
       />
-      <motion.div className="footer">{props.name}</motion.div>
+      <motion.div className="footer">
+        <Avatar />
+        {props.username}
+      </motion.div>
     </motion.div>
   );
 }
@@ -511,7 +530,7 @@ function Grid() {
 
   return (
     <MotionConfig transition={animationMap[animationKey]}>
-      <div className="container">
+      {/* <div className="container">
         <p>
           This is a drag 'n drop prototype. The main goal is to experiment with
           the <em>feel</em> of drag 'n drop.
@@ -545,7 +564,7 @@ function Grid() {
         <br />
         <br />
         <br />
-      </div>
+      </div> */}
       <div className="root container">
         <div className={`grid base ${layer.itemType ? "active" : ""}`}>
           <AnimatePresence key={"item"} initial={false}>
