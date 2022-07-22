@@ -120,8 +120,6 @@ export const CustomDragLayer = (props: any) => {
     // @ts-expect-error
     const initialY = layer.initialSourceClientOffset.y;
 
-    // console.log(initialX, initialY);
-
     // // @ts-expect-error
     // const ox = initialX - layer.initialSourceClientOffset.x;
     // // @ts-expect-error
@@ -195,14 +193,6 @@ export const CustomDragLayer = (props: any) => {
       };
     }
   }, [layer.initialSourceClientOffset]);
-
-  // if (!layer.isDragging) {
-  //   return null;
-  // }
-
-  // return (
-  //   <div style={{ width: 200, height: 200, position: "absolute" }}>Test</div>
-  // );
 
   return (
     <AnimatePresence initial={false}>
@@ -310,7 +300,7 @@ function Item(
       variants={animationVariants}
       draggable={true}
       onDrag={() => {
-        console.log("started...");
+        // console.log("started...");
       }}
       onDoubleClick={() => props.changeSize()}
       layout
@@ -440,7 +430,6 @@ function Grid() {
 
   const remove = (id: string) => {
     const index = items.findIndex((item) => item.id === id);
-    // console.log({ id, index });
     if (index !== -1) {
       const updatedItems = [...items];
       updatedItems.splice(index, 1);
