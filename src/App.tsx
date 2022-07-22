@@ -256,11 +256,6 @@ function Item(
     isDragActive: boolean;
     isHovered: boolean;
     onEndDrag(): void;
-    // dragState:
-    //   | /** Item has been picked up, but user is holding over this item */
-    //   "PICKED_UP"
-    //   /** Item has been picked up, but user is holding over this item */
-    //   | "DRAGGING";
   }
 ) {
   const [_, dragRef, preview] = useDrag(
@@ -294,31 +289,6 @@ function Item(
     }
   }
 
-  // if (props.isDragActive) {
-  //   if (props.isHovered) {
-  //     return (
-  //       <motion.div
-  //         className="item empty"
-  //         exit={{
-  //           opacity: 0,
-  //           transition: {
-  //             duration: 0.2,
-  //           },
-  //         }}
-  //         style={{ color: "red" }}
-  //       >
-  //         HOVERED
-  //       </motion.div>
-  //     );
-  //   } else {
-  //     return (
-  //       <motion.div className="item empty" style={{ color: "red" }}>
-  //         OUT
-  //       </motion.div>
-  //     );
-  //   }
-  // }
-
   return (
     <motion.div
       id={getDraggableId(props.id)}
@@ -338,7 +308,6 @@ function Item(
         }
       }
       variants={animationVariants}
-      // transition={{ duration: 0.6, type: "spring" }}
       draggable={true}
       onDrag={() => {
         console.log("started...");
@@ -395,44 +364,12 @@ function Drop(
   const [baseProps, baseDropRef] = useDrop(
     () => ({
       accept: props.size === "small" ? SMALL_DRAGGABLE : BIG_DRAGGABLE,
-      collect: (monitor) => {
-        return {
-          over: monitor.isOver(),
-        };
-      },
       hover: () => {
         props.onHover(props.id as string);
-      },
-      drop: () => {
-        // alert("dropped");
       },
     }),
     [props.onHover, props.isDragged]
   );
-
-  // console.log(dropProps);
-
-  // console.log(dropProps.over, dropProps.foo);
-
-  // if (dropProps.over) {
-  //   return (
-  //     <div
-  //       ref={dropRef}
-  //       className="item empty"
-  //       style={{ background: dropProps.over ? "blue" : "gold" }}
-  //     ></div>
-  //   );
-  // }
-
-  // if (props.isDragged) {
-  //   return (
-  //     <div
-  //       ref={dropRef}
-  //       className="item empty"
-  //       style={{ background: dropProps.over ? "blue" : "gold" }}
-  //     ></div>
-  //   );
-  // }
 
   if (props.isDragged) {
     return (
@@ -649,57 +586,8 @@ function Grid() {
           })}
         </div> */}
         <CustomDragLayer />
-        {/* <Toolbar isDragActive={Boolean(layer.item)} remove={remove} /> */}
       </div>
     </MotionConfig>
-  );
-}
-
-function Toolbar(props: { isDragActive: boolean; remove(id: string): void }) {
-  const [dropProps, dropRef] = useDrop(
-    () => ({
-      accept: [SMALL_DRAGGABLE],
-      collect: (monitor) => {
-        return {
-          over: monitor.isOver(),
-        };
-      },
-      drop: (item: ItemConfig) => {
-        props.remove(item.id);
-      },
-    }),
-    [props.remove]
-  );
-
-  return (
-    <AnimatePresence>
-      {props.isDragActive && (
-        <div className="toolbar-container">
-          <motion.div
-            initial={"hidden"}
-            animate="visible"
-            variants={{
-              visible: { opacity: 1, y: 0 },
-              hidden: { opacity: 0, y: 120 },
-            }}
-            className="toolbar shadow"
-            style={{
-              backdropFilter: "blur(10px)",
-            }}
-          >
-            <div
-              ref={dropRef}
-              className="item"
-              style={{
-                background: `rgba(0,0,0,${dropProps.over ? 0.1 : 0.05})`,
-              }}
-            >
-              Drop here to remove
-            </div>
-          </motion.div>
-        </div>
-      )}
-    </AnimatePresence>
   );
 }
 
