@@ -9,15 +9,7 @@ import {
 } from "react";
 import { HTML5Backend, getEmptyImage } from "react-dnd-html5-backend";
 import { DndProvider, useDrag, useDragLayer, useDrop } from "react-dnd";
-import {
-  AnimatePresence,
-  isDragActive,
-  LayoutGroup,
-  motion,
-  MotionConfig,
-  MotionTransform,
-} from "framer-motion";
-import { mergeRefs } from "react-merge-refs";
+import { AnimatePresence, motion, MotionConfig } from "framer-motion";
 import "./styles.css";
 import { lerp } from "./helpers";
 import cuid from "cuid";
@@ -45,6 +37,7 @@ type ItemConfig = {
   size: "small" | "big";
 };
 
+// ----
 const RATIO = [1, 0]; // [small, big]
 const NUMBER_OF_ITEMS = 24;
 
@@ -144,10 +137,11 @@ export const CustomDragLayer = (props: any) => {
       maxDistanceScaleY;
 
     let scale = lerp(1, SCALE_MAX, Math.abs(dxp * dxy));
-    scale = 1;
+    scale = props.chaosMode ? scale : 1;
 
-    const ROTATE_MAX = 3;
-    const rotation =
+    // ----
+    let ROTATE_MAX = props.chaosMode ? 360 * 4 : 5;
+    let rotation =
       dxp > 0
         ? lerp(0, ROTATE_MAX, Math.abs(dxp))
         : lerp(0, -ROTATE_MAX, Math.abs(dxp));
@@ -155,14 +149,14 @@ export const CustomDragLayer = (props: any) => {
     const transform = [
       `translate(${x}px, ${y}px)`,
       `rotate(${rotation}deg)`,
-      // `scale(${scale})`,
+      `scale(${scale})`,
     ].join(" ");
 
     return {
       height: sizes.rect?.height ?? 0,
       width: sizes.rect?.width,
       maxWidth: sizes.rect?.width,
-      background: "#e5e5e5",
+      // background: "#e5e5e5",
       transform,
     };
   };
@@ -395,7 +389,9 @@ const animationMap = {
   DEFAULT_SPRINGY: { type: "spring" },
   LESS_SPRINGY: { type: "spring", bounce: 0.3 },
   LESS_SPRINGY_AND_FASTER: { duration: 0.4, type: "spring", bounce: 0.3 },
+  // ----
   CUSTOM_SPRING_V1: { type: "spring", damping: 12, mass: 0.2, stiffness: 150 },
+  // CUSTOM_SPRING_V1: { type: "spring", damping: 30, mass: 0.5, stiffness: 100 },
   NO_SPRING: { type: "tween" },
 };
 
@@ -447,6 +443,8 @@ function Grid() {
     }
   };
 
+  const [chaosMode, setChaosMode] = useState(false);
+
   const isDragging = Boolean(layer.item);
   const showDropArea = isDragging;
 
@@ -491,6 +489,7 @@ function Grid() {
         <br />
         <br />
       </div> */}
+      <button onClick={() => setChaosMode((wut) => !wut)}>Chaos mode</button>
       <div className="root container">
         <div className={`grid base ${layer.itemType ? "active" : ""}`}>
           <AnimatePresence key={"item"} initial={false}>
@@ -512,6 +511,7 @@ function Grid() {
                       isHovered={isHovered}
                       changeSize={() => changeSize(item.id)}
                       remove={() => remove(item.id)}
+                      // chaosMode={chaosMode}
                       {...item}
                     />
                   )}
@@ -574,7 +574,7 @@ function Grid() {
             return <Drop key={"drop-big" + item.id} {...item} size="big" />;
           })}
         </div> */}
-        <CustomDragLayer />
+        <CustomDragLayer chaosMode={chaosMode} />
       </div>
     </MotionConfig>
   );

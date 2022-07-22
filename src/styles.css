@@ -47,6 +47,8 @@ button.close:hover {
 
 .root {
   position: relative;
+  margin-top: 10vh;
+  margin-bottom: 10vh;
 } 
 
 .shadow {
