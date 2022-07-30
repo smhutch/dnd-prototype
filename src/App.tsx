@@ -247,6 +247,7 @@ function Item(
     () => ({
       type: props.size === "small" ? SMALL_DRAGGABLE : BIG_DRAGGABLE,
       item: {
+        index: props.index,
         id: props.id,
         imageUrl: props.imageUrl,
         username: props.username,
@@ -496,29 +497,43 @@ function Grid() {
     animationValues[3] as any
   );
 
+  console.log(layer.item);
+
   return (
     <MotionConfig transition={animationMap[animationKey]}>
       <div className="root container">
         <div className={`grid base ${layer.itemType ? "active" : ""}`}>
           <AnimatePresence key={"item"} initial={false}>
-            {items.map((item) => {
+            {items.map((item, index) => {
               const isDragActive = Boolean(
                 layer.item && layer.item.id === item.id
               );
               const isHovered = draggingOverId === item.id;
 
+              const dropIndicator = isHovered ? (
+                <motion.div
+                  className="item empty"
+                  style={{ background: "gold" }}
+                />
+              ) : null;
+
+              let dropIndicatorPosition = "NONE";
+              if (layer.item) {
+                if (layer.item.index > index) {
+                  dropIndicatorPosition = "BEFORE";
+                }
+                // if (layer.item.index < index) {
+                //   dropIndicatorPosition = "AFTER";
+                // }
+              }
+
               return (
                 <Fragment key={`item-${item.id}`}>
-                  {/* This element is added to "take the place" of the current item */}
-                  {isHovered && (
-                    <motion.div
-                      className="item empty"
-                      style={{ background: "red" }}
-                    />
-                  )}
+                  {dropIndicatorPosition === "BEFORE" && dropIndicator}
                   {/* // if item is being dragged, and it's not over it's initial position, remove it from the grid */}
                   {isDragActive && draggingOverId !== null ? null : (
                     <Item
+                      index={index}
                       isDragActive={isDragActive}
                       onEndDrag={() => setDraggingOverId(null)}
                       isHovered={isHovered}
@@ -529,6 +544,7 @@ function Grid() {
                       {...item}
                     />
                   )}
+                  {dropIndicatorPosition === "AFTER" && dropIndicator}
                 </Fragment>
               );
             })}
