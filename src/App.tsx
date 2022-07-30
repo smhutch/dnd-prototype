@@ -14,6 +14,7 @@ import "./styles.css";
 import { lerp } from "./helpers";
 import cuid from "cuid";
 import Chance from "chance";
+import { mergeRefs } from "react-merge-refs";
 
 const chance = new Chance();
 
@@ -240,9 +241,9 @@ function Item(
     isDragActive: boolean;
     isHovered: boolean;
     onEndDrag(): void;
-  }
+  } & any
 ) {
-  const [_, dragRef, preview] = useDrag(
+  const [dragProps, dragRef, preview] = useDrag(
     () => ({
       type: props.size === "small" ? SMALL_DRAGGABLE : BIG_DRAGGABLE,
       item: {
@@ -251,9 +252,37 @@ function Item(
         username: props.username,
       },
       end: () => props.onEndDrag(),
+      collect: (monitor) => {
+        return {
+          m: monitor.isDragging(),
+        };
+      },
     }),
     [props.onEndDrag]
   );
+
+  // console.log(props.draggedItem);
+
+  const [dropProps, dropRef] = useDrop(
+    () => ({
+      // accept: props.size === "small" ? SMALL_DRAGGABLE : BIG_DRAGGABLE,
+      accept: [SMALL_DRAGGABLE, BIG_DRAGGABLE],
+      collect: (monitor) => {
+        return {
+          over: monitor.isOver(),
+        };
+      },
+      hover: () => {
+        props.onHoverWhileDragging(props.id as string);
+      },
+      drop: (drag: any) => {
+        props.onDrop(drag.id, props.id);
+      },
+    }),
+    [props.onHover, props.isDragged]
+  );
+
+  // console.log(dropProps);
 
   useEffect(() => {
     preview(getEmptyImage(), { captureDraggingState: true });
@@ -269,17 +298,25 @@ function Item(
     if (props.isHovered) {
       return null;
     } else {
-      return <motion.div className="item empty" layout />;
+      return (
+        <motion.div
+          className={`item empty ${props.size}`}
+          // style={{ background: "red" }}
+          layout
+        />
+      );
     }
   }
 
   return (
     <motion.div
       id={getDraggableId(props.id)}
-      ref={dragRef}
+      ref={mergeRefs([dragRef])}
       className={`item card shadow ${props.size}`}
       style={{
         transformOrigin: "top left",
+        height: "100%",
+        background: "blue",
       }}
       initial={animationVariants.hidden}
       animate={props.isDragActive ? "dragging" : "show"}
@@ -316,6 +353,16 @@ function Item(
         <Avatar />
         {props.username}
       </motion.div>
+      <div
+        ref={dropRef}
+        style={{
+          background: dropProps.over ? "red" : "blue",
+          position: "absolute",
+          opacity: 0.2,
+          inset: 0,
+          display: props.draggedItem ? "block" : "none",
+        }}
+      />
     </motion.div>
   );
 }
@@ -391,7 +438,6 @@ const animationMap = {
   LESS_SPRINGY_AND_FASTER: { duration: 0.4, type: "spring", bounce: 0.3 },
   // ----
   CUSTOM_SPRING_V1: { type: "spring", damping: 12, mass: 0.2, stiffness: 150 },
-  // CUSTOM_SPRING_V1: { type: "spring", damping: 30, mass: 0.5, stiffness: 100 },
   NO_SPRING: { type: "tween" },
 };
 
@@ -452,41 +498,6 @@ function Grid() {
 
   return (
     <MotionConfig transition={animationMap[animationKey]}>
-      {/* <div className="container">
-        <p>
-          This is a drag 'n drop prototype. The main goal is to experiment with
-          the <em>feel</em> of drag 'n drop.
-        </p>
-        <p>Please think about:</p>
-        <ul>
-          <li>Do you like the feel of the animations?</li>
-          <li>Does the reordering feel intuitive?</li>
-          <li>Do you like being able to drag the entire card?</li>
-        </ul>
-        <p>The buttons below can be used to add more items:</p>
-        <button onClick={() => add("small", 0)}>add to start</button>
-        <button onClick={() => add("small", items.length + 1)}>
-          add to end
-        </button>
-        <br />
-        <br />
-        <p>Animation style:</p>
-        <select
-          value={animationKey}
-          onChange={(ev) => {
-            setAnimationKey(ev.target.value as any);
-          }}
-        >
-          <option value={animationValues[0]}>{animationValues[0]}</option>
-          <option value={animationValues[1]}>{animationValues[1]}</option>
-          <option value={animationValues[2]}>{animationValues[2]}</option>
-          <option value={animationValues[3]}>{animationValues[3]}</option>
-          <option value={animationValues[4]}>{animationValues[4]}</option>
-        </select>
-        <br />
-        <br />
-        <br />
-      </div> */}
       <div className="root container">
         <div className={`grid base ${layer.itemType ? "active" : ""}`}>
           <AnimatePresence key={"item"} initial={false}>
@@ -499,7 +510,12 @@ function Grid() {
               return (
                 <Fragment key={`item-${item.id}`}>
                   {/* This element is added to "take the place" of the current item */}
-                  {isHovered && <motion.div className="item empty" />}
+                  {isHovered && (
+                    <motion.div
+                      className="item empty"
+                      style={{ background: "red" }}
+                    />
+                  )}
                   {/* // if item is being dragged, and it's not over it's initial position, remove it from the grid */}
                   {isDragActive && draggingOverId !== null ? null : (
                     <Item
@@ -508,6 +524,8 @@ function Grid() {
                       isHovered={isHovered}
                       changeSize={() => changeSize(item.id)}
                       remove={() => remove(item.id)}
+                      draggedItem={layer.item}
+                      onHoverWhileDragging={setDraggingOverId}
                       {...item}
                     />
                   )}
@@ -516,7 +534,7 @@ function Grid() {
             })}
           </AnimatePresence>
         </div>
-        {showDropArea && (
+        {/* {showDropArea && (
           <div className="grid dropgrid small">
             {items.map((item) => {
               const isDragActive = Boolean(
@@ -564,7 +582,7 @@ function Grid() {
               );
             })}
           </div>
-        )}
+        )} */}
         {/* <div className="grid dropgrid big">
           {[...items].splice(0, BIG_ITEMS_MAX).map((item) => {
             return <Drop key={"drop-big" + item.id} {...item} size="big" />;

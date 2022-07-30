@@ -137,6 +137,16 @@ button.close:hover {
 
 }
 
+.item.empty.small {
+  /* background: green; */
+}
+
+.item.empty.big {
+  /* background: gold; */
+  grid-column: span 2;
+  grid-row: span 2;
+}
+
 .item.drop.small {}
 
 .item.drop.big {
