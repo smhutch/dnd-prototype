@@ -137,10 +137,10 @@ export const CustomDragLayer = (props: any) => {
       maxDistanceScaleY;
 
     let scale = lerp(1, SCALE_MAX, Math.abs(dxp * dxy));
-    scale = props.chaosMode ? scale : 1;
+    scale = 1;
 
     // ----
-    let ROTATE_MAX = props.chaosMode ? 360 * 4 : 5;
+    let ROTATE_MAX = 5;
     let rotation =
       dxp > 0
         ? lerp(0, ROTATE_MAX, Math.abs(dxp))
@@ -443,8 +443,6 @@ function Grid() {
     }
   };
 
-  const [chaosMode, setChaosMode] = useState(false);
-
   const isDragging = Boolean(layer.item);
   const showDropArea = isDragging;
 
@@ -489,7 +487,6 @@ function Grid() {
         <br />
         <br />
       </div> */}
-      <button onClick={() => setChaosMode((wut) => !wut)}>Chaos mode</button>
       <div className="root container">
         <div className={`grid base ${layer.itemType ? "active" : ""}`}>
           <AnimatePresence key={"item"} initial={false}>
@@ -511,7 +508,6 @@ function Grid() {
                       isHovered={isHovered}
                       changeSize={() => changeSize(item.id)}
                       remove={() => remove(item.id)}
-                      // chaosMode={chaosMode}
                       {...item}
                     />
                   )}
@@ -574,7 +570,7 @@ function Grid() {
             return <Drop key={"drop-big" + item.id} {...item} size="big" />;
           })}
         </div> */}
-        <CustomDragLayer chaosMode={chaosMode} />
+        <CustomDragLayer />
       </div>
     </MotionConfig>
   );
