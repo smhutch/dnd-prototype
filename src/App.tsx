@@ -39,8 +39,16 @@ type ItemConfig = {
 };
 
 // ----
-const RATIO = [1, 0]; // [small, big]
+const RATIO = [1, 1]; // [small, big]
 const NUMBER_OF_ITEMS = 8;
+
+const debounce = (fn: Function, ms = 300) => {
+  let timeoutId: ReturnType<typeof setTimeout>;
+  return function (this: any, ...args: any[]) {
+    clearTimeout(timeoutId);
+    timeoutId = setTimeout(() => fn.apply(this, args), ms);
+  };
+};
 
 const makeItem = (size: ItemConfig["size"]): ItemConfig => ({
   id: cuid(),
@@ -257,6 +265,7 @@ function Item(
         id: props.id,
         imageUrl: props.imageUrl,
         username: props.username,
+        size: props.size,
       },
       end: () => props.onEndDrag(),
       collect: (monitor) => {
@@ -277,29 +286,57 @@ function Item(
           over: monitor.isOver(),
         };
       },
-      hover: (item, monitor) => {
+      hover: (draggedItem, monitor) => {
         if (!rootBox) return;
 
+        const debounced = debounce(props.onHoverWhileDragging, 100);
+
         const pointer = monitor.getClientOffset();
-
         if (!pointer) return;
-        const midX = rootBox.left + rootBox.width / 2;
+        const x1 = rootBox.left + rootBox.width * 0.5;
+        const x2 = rootBox.left + rootBox.width * 0.5;
 
-        if (pointer.x < midX) {
-          props.onHoverWhileDragging({
+        // if (props.index === draggedItem.index - 1) {
+        //   if (pointer.x < x1) {
+        //     return props.onHoverWhileDragging({
+        //       position: "before",
+        //       id: props.id as string,
+        //     });
+        //   } else {
+        //     return props.onHoverWhileDragging({
+        //       position: "after",
+        //       id: props.id as string,
+        //     });
+        //   }
+        // }
+
+        // if (props.index === draggedItem.index + 1) {
+        //   if (pointer.x < x2) {
+        //     return props.onHoverWhileDragging({
+        //       position: "before",
+        //       id: props.id as string,
+        //     });
+        //   } else {
+        //     return props.onHoverWhileDragging({
+        //       position: "after",
+        //       id: props.id as string,
+        //     });
+        //   }
+        // }
+
+        if (props.index < draggedItem.index) {
+          return props.onHoverWhileDragging({
             position: "before",
             id: props.id as string,
           });
-        } else {
-          props.onHoverWhileDragging({
+        }
+
+        if (props.index > draggedItem.index) {
+          return props.onHoverWhileDragging({
             position: "after",
             id: props.id as string,
           });
         }
-        // const /
-        // console.log(monitor.getItem());
-
-        // console.log(rootBox, monitor.getClientOffset());
       },
       drop: (drag: any) => {
         props.onDrop(drag.id, props.id);
@@ -346,6 +383,23 @@ function Item(
       }}
       initial={animationVariants.hidden}
       animate={props.isDragActive ? "dragging" : "show"}
+      onLayoutAnimationStart={() => {
+        console.log("i layout start");
+        props.onLayoutAnimationStart();
+      }}
+      onLayoutAnimationComplete={() => {
+        console.log("i layout complete");
+        props.onLayoutAnimationComplete();
+      }}
+      onAnimationStart={() => {
+        console.log("i start");
+      }}
+      onAnimationComplete={() => {
+        console.log("i complete");
+      }}
+      onAnimationEnd={() => {
+        console.log("i end");
+      }}
       exit={
         {
           // opacity: 0,
@@ -422,7 +476,7 @@ function Drop(
     () => ({
       accept: props.size === "small" ? SMALL_DRAGGABLE : BIG_DRAGGABLE,
       hover: (c) => {
-        console.log({ c });
+        // console.log({ c });
         props.onHover(props.id as string);
       },
     }),
@@ -517,6 +571,8 @@ function Grid() {
     }
   };
 
+  const [enableMoveOnHover, setEnableMoveOnHover] = useState(true);
+
   const isDragging = Boolean(layer.item);
   const showDropArea = isDragging;
 
@@ -537,10 +593,28 @@ function Grid() {
                 ? draggingOver.id === item.id
                 : false;
 
+              // console.log(layer.item);
+
               const dropIndicator = isHovered ? (
                 <motion.div
-                  className="item empty"
+                  className={`item empty ${layer ? layer.item.size : ""}`}
+                  onLayoutAnimationStart={() => {
+                    console.log("layout start");
+                  }}
+                  onLayoutAnimationComplete={() => {
+                    console.log("layout complete");
+                  }}
+                  onAnimationStart={() => {
+                    console.log("gold start");
+                  }}
+                  onAnimationComplete={() => {
+                    console.log("gold complete");
+                  }}
+                  onAnimationEnd={() => {
+                    console.log("gold end");
+                  }}
                   style={{ background: "gold" }}
+                  layout
                 />
               ) : null;
 
@@ -581,7 +655,13 @@ function Grid() {
                       changeSize={() => changeSize(item.id)}
                       remove={() => remove(item.id)}
                       draggedItem={layer.item}
-                      onHoverWhileDragging={setDraggingOver}
+                      onLayoutAnimationComplete={() =>
+                        setEnableMoveOnHover(true)
+                      }
+                      onLayoutAnimationStart={() => setEnableMoveOnHover(false)}
+                      onHoverWhileDragging={(arg: any) => {
+                        enableMoveOnHover && setDraggingOver(arg);
+                      }}
                       {...item}
                     />
                   )}
