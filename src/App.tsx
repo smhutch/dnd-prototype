@@ -40,7 +40,7 @@ type ItemConfig = {
 
 // ----
 const RATIO = [1, 0]; // [small, big]
-const NUMBER_OF_ITEMS = 24;
+const NUMBER_OF_ITEMS = 8;
 
 const makeItem = (size: ItemConfig["size"]): ItemConfig => ({
   id: cuid(),
@@ -243,6 +243,12 @@ function Item(
     onEndDrag(): void;
   } & any
 ) {
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  const rootBox = rootRef.current
+    ? rootRef.current.getBoundingClientRect()
+    : null;
+
   const [dragProps, dragRef, preview] = useDrag(
     () => ({
       type: props.size === "small" ? SMALL_DRAGGABLE : BIG_DRAGGABLE,
@@ -262,8 +268,6 @@ function Item(
     [props.onEndDrag]
   );
 
-  // console.log(props.draggedItem);
-
   const [dropProps, dropRef] = useDrop(
     () => ({
       // accept: props.size === "small" ? SMALL_DRAGGABLE : BIG_DRAGGABLE,
@@ -273,14 +277,35 @@ function Item(
           over: monitor.isOver(),
         };
       },
-      hover: () => {
-        props.onHoverWhileDragging(props.id as string);
+      hover: (item, monitor) => {
+        if (!rootBox) return;
+
+        const pointer = monitor.getClientOffset();
+
+        if (!pointer) return;
+        const midX = rootBox.left + rootBox.width / 2;
+
+        if (pointer.x < midX) {
+          props.onHoverWhileDragging({
+            position: "before",
+            id: props.id as string,
+          });
+        } else {
+          props.onHoverWhileDragging({
+            position: "after",
+            id: props.id as string,
+          });
+        }
+        // const /
+        // console.log(monitor.getItem());
+
+        // console.log(rootBox, monitor.getClientOffset());
       },
       drop: (drag: any) => {
         props.onDrop(drag.id, props.id);
       },
     }),
-    [props.onHover, props.isDragged]
+    [props.onHover, props.isDragged, rootBox]
   );
 
   // console.log(dropProps);
@@ -312,7 +337,7 @@ function Item(
   return (
     <motion.div
       id={getDraggableId(props.id)}
-      ref={mergeRefs([dragRef])}
+      ref={mergeRefs([dragRef, rootRef])}
       className={`item card shadow ${props.size}`}
       style={{
         transformOrigin: "top left",
@@ -352,7 +377,7 @@ function Item(
       />
       <motion.div className="footer">
         <Avatar />
-        {props.username}
+        {props.username} {props.index}
       </motion.div>
       <div
         ref={dropRef}
@@ -396,7 +421,8 @@ function Drop(
   const [baseProps, baseDropRef] = useDrop(
     () => ({
       accept: props.size === "small" ? SMALL_DRAGGABLE : BIG_DRAGGABLE,
-      hover: () => {
+      hover: (c) => {
+        console.log({ c });
         props.onHover(props.id as string);
       },
     }),
@@ -446,9 +472,10 @@ const animationValues = Object.keys(animationMap);
 
 function Grid() {
   const [items, setItems] = useState(initialItems);
-  const [draggingOverId, setDraggingOverId] = useState<ItemConfig["id"] | null>(
-    null
-  );
+  const [draggingOver, setDraggingOver] = useState<{
+    id: ItemConfig["id"];
+    position: "before" | "after";
+  } | null>(null);
   const [isInitialAnimationEnabled, setIsInitialAnimationEnabled] =
     useState(false);
 
@@ -497,8 +524,6 @@ function Grid() {
     animationValues[3] as any
   );
 
-  console.log(layer.item);
-
   return (
     <MotionConfig transition={animationMap[animationKey]}>
       <div className="root container">
@@ -508,7 +533,9 @@ function Grid() {
               const isDragActive = Boolean(
                 layer.item && layer.item.id === item.id
               );
-              const isHovered = draggingOverId === item.id;
+              const isHovered = draggingOver
+                ? draggingOver.id === item.id
+                : false;
 
               const dropIndicator = isHovered ? (
                 <motion.div
@@ -518,29 +545,43 @@ function Grid() {
               ) : null;
 
               let dropIndicatorPosition = "NONE";
-              if (layer.item) {
-                if (layer.item.index > index) {
+              if (draggingOver) {
+                if (draggingOver.position === "after") {
+                  dropIndicatorPosition = "AFTER";
+                }
+
+                if (draggingOver.position === "before") {
                   dropIndicatorPosition = "BEFORE";
                 }
-                // if (layer.item.index < index) {
-                //   dropIndicatorPosition = "AFTER";
-                // }
               }
+              // if (layer.item) {
+              //   if (layer.item.index > index) {
+              //     dropIndicatorPosition = "BEFORE";
+              //   }
+              //   // if (layer.item.index === index - 1) {
+              //   //   dropIndicatorPosition = "BEFORE";
+              //   // }
+              //   if (layer.item.index < index) {
+              //     dropIndicatorPosition = "AFTER";
+              //   }
+              // }
 
               return (
                 <Fragment key={`item-${item.id}`}>
                   {dropIndicatorPosition === "BEFORE" && dropIndicator}
                   {/* // if item is being dragged, and it's not over it's initial position, remove it from the grid */}
-                  {isDragActive && draggingOverId !== null ? null : (
+                  {isDragActive &&
+                  draggingOver &&
+                  draggingOver.id !== null ? null : (
                     <Item
                       index={index}
                       isDragActive={isDragActive}
-                      onEndDrag={() => setDraggingOverId(null)}
+                      onEndDrag={() => setDraggingOver(null)}
                       isHovered={isHovered}
                       changeSize={() => changeSize(item.id)}
                       remove={() => remove(item.id)}
                       draggedItem={layer.item}
-                      onHoverWhileDragging={setDraggingOverId}
+                      onHoverWhileDragging={setDraggingOver}
                       {...item}
                     />
                   )}
@@ -567,7 +608,7 @@ function Grid() {
                   key={"drop-small" + item.id}
                   {...item}
                   size="small"
-                  onHover={setDraggingOverId}
+                  onHover={setDraggingOver}
                   isDragged={isDragActive}
                   onDrop={(droppedId: string, droppedOnId: string) => {
                     const droppedIndex = items.findIndex(
