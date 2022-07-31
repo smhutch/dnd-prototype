@@ -39,8 +39,8 @@ type ItemConfig = {
 };
 
 // ----
-const RATIO = [1, 1]; // [small, big]
-const NUMBER_OF_ITEMS = 8;
+const RATIO = [1, 0]; // [small, big]
+const NUMBER_OF_ITEMS = 4;
 
 const debounce = (fn: Function, ms = 300) => {
   let timeoutId: ReturnType<typeof setTimeout>;
@@ -242,7 +242,7 @@ export const CustomDragLayer = (props: any) => {
   );
 };
 
-function Item(
+function ArtworkCard(
   props: ItemConfig & {
     changeSize(): void;
     remove(): void;
@@ -400,14 +400,6 @@ function Item(
       onAnimationEnd={() => {
         console.log("i end");
       }}
-      exit={
-        {
-          // opacity: 0,
-          // transition: {
-          //   duration: 0.2,
-          // },
-        }
-      }
       variants={animationVariants}
       draggable={true}
       onDrag={() => {
@@ -513,17 +505,6 @@ function Drop(
   );
 }
 
-const animationMap = {
-  DEFAULT_SPRINGY: { type: "spring" },
-  LESS_SPRINGY: { type: "spring", bounce: 0.3 },
-  LESS_SPRINGY_AND_FASTER: { duration: 0.4, type: "spring", bounce: 0.3 },
-  // ----
-  CUSTOM_SPRING_V1: { type: "spring", damping: 12, mass: 0.2, stiffness: 150 },
-  NO_SPRING: { type: "tween" },
-};
-
-const animationValues = Object.keys(animationMap);
-
 function Grid() {
   const [items, setItems] = useState(initialItems);
   const [draggingOver, setDraggingOver] = useState<{
@@ -573,15 +554,10 @@ function Grid() {
 
   const [enableMoveOnHover, setEnableMoveOnHover] = useState(true);
 
-  const isDragging = Boolean(layer.item);
-  const showDropArea = isDragging;
-
-  const [animationKey, setAnimationKey] = useState<keyof typeof animationMap>(
-    animationValues[3] as any
-  );
-
   return (
-    <MotionConfig transition={animationMap[animationKey]}>
+    <MotionConfig
+      transition={{ type: "spring", damping: 12, mass: 0.2, stiffness: 150 }}
+    >
       <div className="root container">
         <div className={`grid base ${layer.itemType ? "active" : ""}`}>
           <AnimatePresence key={"item"} initial={false}>
@@ -647,7 +623,7 @@ function Grid() {
                   {isDragActive &&
                   draggingOver &&
                   draggingOver.id !== null ? null : (
-                    <Item
+                    <ArtworkCard
                       index={index}
                       isDragActive={isDragActive}
                       onEndDrag={() => setDraggingOver(null)}
