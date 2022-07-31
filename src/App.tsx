@@ -246,8 +246,8 @@ function ArtworkCard(
   props: ItemConfig & {
     changeSize(): void;
     remove(): void;
-    isDragActive: boolean;
     isHovered: boolean;
+    isPickedUp: boolean;
     onEndDrag(): void;
   } & any
 ) {
@@ -357,10 +357,11 @@ function ArtworkCard(
     dragging: { opacity: 0.2, scaleX: 1 },
   };
 
-  if (props.isDragActive) {
-    if (props.isHovered) {
+  if (props.isPickedUp) {
+    if (props.isDraggingOverDropzone) {
       return null;
     } else {
+      // This is intentionally NOT a dropzone
       return (
         <motion.div
           className={`item empty ${props.size}`}
@@ -379,10 +380,9 @@ function ArtworkCard(
       style={{
         transformOrigin: "top left",
         height: "100%",
-        background: "blue",
       }}
       initial={animationVariants.hidden}
-      animate={props.isDragActive ? "dragging" : "show"}
+      animate={props.isPickedUp ? "dragging" : "show"}
       onLayoutAnimationStart={() => {
         console.log("i layout start");
         props.onLayoutAnimationStart();
@@ -390,15 +390,6 @@ function ArtworkCard(
       onLayoutAnimationComplete={() => {
         console.log("i layout complete");
         props.onLayoutAnimationComplete();
-      }}
-      onAnimationStart={() => {
-        console.log("i start");
-      }}
-      onAnimationComplete={() => {
-        console.log("i complete");
-      }}
-      onAnimationEnd={() => {
-        console.log("i end");
       }}
       variants={animationVariants}
       draggable={true}
@@ -436,72 +427,6 @@ function ArtworkCard(
         }}
       />
     </motion.div>
-  );
-}
-
-function Drop(
-  props: ItemConfig & {
-    isDragged: boolean;
-    onDrop(droppedItemId: string, moveToBeforeItemId: string): void;
-    onHover(id: string): void;
-    // onHoverPickedUp(id: string): void;
-  }
-) {
-  const [dropProps, dropRef] = useDrop(
-    () => ({
-      accept: props.size === "small" ? SMALL_DRAGGABLE : BIG_DRAGGABLE,
-      collect: (monitor) => {
-        return {
-          over: monitor.isOver(),
-        };
-      },
-      hover: () => {
-        props.onHover(props.id as string);
-      },
-      drop: (drag: any) => {
-        props.onDrop(drag.id, props.id);
-      },
-    }),
-    [props.onHover, props.isDragged]
-  );
-  const [baseProps, baseDropRef] = useDrop(
-    () => ({
-      accept: props.size === "small" ? SMALL_DRAGGABLE : BIG_DRAGGABLE,
-      hover: (c) => {
-        // console.log({ c });
-        props.onHover(props.id as string);
-      },
-    }),
-    [props.onHover, props.isDragged]
-  );
-
-  if (props.isDragged) {
-    return (
-      <div
-        ref={baseDropRef}
-        className={`item empty ${props.size}`}
-        style={{
-          // making this 'all' breaks chrome
-          // must be 'none' to allow draggable to work
-          pointerEvents: "none",
-          // background: "red",
-          // opacity: 0.2,
-        }}
-      />
-    );
-  }
-
-  return (
-    <div
-      ref={dropRef}
-      className={`item ${props.isDragged ? "empty" : ""} ${props.size}`}
-      style={{
-        pointerEvents: "all",
-        background: "black",
-        opacity: 0, // increase to debug
-        transition: "opacity 10s ease",
-      }}
-    />
   );
 }
 
@@ -562,12 +487,15 @@ function Grid() {
         <div className={`grid base ${layer.itemType ? "active" : ""}`}>
           <AnimatePresence key={"item"} initial={false}>
             {items.map((item, index) => {
-              const isDragActive = Boolean(
+              const isPickedUp = Boolean(
                 layer.item && layer.item.id === item.id
               );
+              const isDraggingOverDropzone = Boolean(draggingOver);
               const isHovered = draggingOver
                 ? draggingOver.id === item.id
                 : false;
+
+              console.log(draggingOver);
 
               // console.log(layer.item);
 
@@ -619,14 +547,15 @@ function Grid() {
               return (
                 <Fragment key={`item-${item.id}`}>
                   {dropIndicatorPosition === "BEFORE" && dropIndicator}
-                  {/* // if item is being dragged, and it's not over it's initial position, remove it from the grid */}
-                  {isDragActive &&
+                  {/* if item has been picked up, but is being dragged over another item, remove the source item from the grid */}
+                  {isPickedUp &&
                   draggingOver &&
                   draggingOver.id !== null ? null : (
                     <ArtworkCard
                       index={index}
-                      isDragActive={isDragActive}
+                      isPickedUp={isPickedUp}
                       onEndDrag={() => setDraggingOver(null)}
+                      isDraggingOverDropzone={isDraggingOverDropzone}
                       isHovered={isHovered}
                       changeSize={() => changeSize(item.id)}
                       remove={() => remove(item.id)}
@@ -647,60 +576,6 @@ function Grid() {
             })}
           </AnimatePresence>
         </div>
-        {/* {showDropArea && (
-          <div className="grid dropgrid small">
-            {items.map((item) => {
-              const isDragActive = Boolean(
-                layer.item && layer.item.id === item.id
-              );
-              const isHovered = draggingOverId === item.id;
-
-              if (isDragActive && draggingOverId !== null) {
-                return null;
-              }
-
-              return (
-                <Drop
-                  key={"drop-small" + item.id}
-                  {...item}
-                  size="small"
-                  onHover={setDraggingOver}
-                  isDragged={isDragActive}
-                  onDrop={(droppedId: string, droppedOnId: string) => {
-                    const droppedIndex = items.findIndex(
-                      ({ id }) => id === droppedId
-                    );
-
-                    const droppedOnIndex = items.findIndex(
-                      ({ id }) => id === droppedOnId
-                    );
-
-                    if (droppedIndex !== -1 && droppedOnIndex !== -1) {
-                      const updatedItems = [...items];
-                      // remove dragged item from array
-                      const removedItems = updatedItems.splice(droppedIndex, 1);
-                      updatedItems.splice(
-                        droppedOnIndex === 0
-                          ? 0
-                          : droppedIndex > droppedOnIndex
-                          ? droppedOnIndex
-                          : droppedOnIndex - 1,
-                        0,
-                        removedItems[0]
-                      );
-                      setItems(updatedItems);
-                    }
-                  }}
-                />
-              );
-            })}
-          </div>
-        )} */}
-        {/* <div className="grid dropgrid big">
-          {[...items].splice(0, BIG_ITEMS_MAX).map((item) => {
-            return <Drop key={"drop-big" + item.id} {...item} size="big" />;
-          })}
-        </div> */}
         <CustomDragLayer />
       </div>
     </MotionConfig>
