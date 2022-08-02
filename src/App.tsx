@@ -39,7 +39,7 @@ type ItemConfig = {
 };
 
 // ----
-const RATIO = [1, 0]; // [small, big]
+const RATIO = [1, 0.2]; // [small, big]
 const NUMBER_OF_ITEMS = 8;
 
 const makeItem = (size: ItemConfig["size"]): ItemConfig => ({
@@ -193,25 +193,6 @@ export const CustomDragLayer = (props: any) => {
     <AnimatePresence initial={false}>
       {layer.isDragging && (
         <motion.div
-          // exit={{
-          //   x: lastKnownOffset.current?.x || 0,
-          //   y: lastKnownOffset.current?.y || 0,
-          //   transition: {
-          //     duration: 0.8,
-          //     type: "spring",
-          //   },
-          // }}
-          // animate={{
-          //   x: pos.x,
-          //   y: pos.y,
-          // }}
-          // animate={{
-          //   ...(styles as any),
-          //   transition: {
-          //     duration: 0.8,
-          //     type: "spring",
-          //   },
-          // }}
           style={{
             ...styles,
             pointerEvents: "none",
@@ -234,6 +215,19 @@ export const CustomDragLayer = (props: any) => {
   );
 };
 
+const DEBUG_MODE = true as boolean;
+
+type DebugLogOption = {
+  draggedIndex: number;
+  hoveringOverIndex: number;
+  position: "BEFORE" | "AFTER";
+};
+
+const debugLog = (message: string, options: DebugLogOption) => {
+  if (!DEBUG_MODE) return;
+  console.debug("dnd", message, options);
+};
+
 function ArtworkCard(
   props: ItemConfig & {
     changeSize(): void;
@@ -250,7 +244,7 @@ function ArtworkCard(
     ? rootRef.current.getBoundingClientRect()
     : null;
 
-  const [dragProps, dragRef, preview] = useDrag(
+  const [_dragProps, dragRef, preview] = useDrag(
     () => ({
       type: props.size === "small" ? SMALL_DRAGGABLE : BIG_DRAGGABLE,
       item: {
@@ -261,43 +255,56 @@ function ArtworkCard(
         size: props.size,
       },
       end: () => props.onEndDrag(),
-      collect: (monitor) => {
-        return {
-          m: monitor.isDragging(),
-        };
-      },
     }),
     [props.onEndDrag]
   );
 
-  const [dropProps, dropRef] = useDrop(
+  const [_dropProps, dropRef] = useDrop(
     () => ({
-      // accept: props.size === "small" ? SMALL_DRAGGABLE : BIG_DRAGGABLE,
-      accept: [SMALL_DRAGGABLE, BIG_DRAGGABLE],
+      accept:
+        props.size === "big"
+          ? [BIG_DRAGGABLE]
+          : [SMALL_DRAGGABLE, BIG_DRAGGABLE],
       collect: (monitor) => {
         return {
           over: monitor.isOver(),
         };
       },
+      canDrop: () => {
+        return props.enableMoveOnHover && props.size !== "big";
+      },
       hover: (draggedItem, monitor) => {
         const { draggedItemRect } = props;
+        if (!props.enableMoveOnHover) return;
         if (!draggedItemRect) return;
 
         if (!rootRect) return;
-        // console.log(draggedElBox);
-
-        // console.log(draggedEl, draggedItem.id, props.draggedItemRef.current);
 
         const pointer = monitor.getClientOffset();
-        const movement = monitor.getDifferenceFromInitialOffset();
 
         const sourcePosition = monitor.getInitialSourceClientOffset();
         const initialPointer = monitor.getInitialClientOffset();
 
+        const addShadow = (position: "BEFORE" | "AFTER") => {
+          return props.onHoverWhileDragging({
+            position,
+            id: props.id,
+            index: props.index,
+          });
+        };
+
+        const debugHoverLog = (message: string, position: "BEFORE" | "AFTER") =>
+          debugLog(message, {
+            draggedIndex: draggedItem.index,
+            hoveringOverIndex: props.index,
+            position,
+          });
+
         if (!pointer || !initialPointer || !sourcePosition) return;
 
         /**
-         * Check if user is dragging over the initial position of the dragged item
+         * Check if user is dragging over the INITIAL position of the dragged item
+         * If so, create a space for the user to put it back down.
          */
         if (
           pointer.x > draggedItemRect.left &&
@@ -305,115 +312,62 @@ function ArtworkCard(
           pointer.y > draggedItemRect.top &&
           pointer.y < draggedItemRect.top + draggedItemRect.height
         ) {
-          console.log("back");
-          return props.onHoverWhileDragging({
-            position: props.index > draggedItem.index ? "BEFORE" : "AFTER",
-            id: props.id,
-          });
+          const POSITION = props.index > draggedItem.index ? "BEFORE" : "AFTER";
+          debugHoverLog("INITIAL", POSITION);
+          return addShadow(POSITION);
         }
 
-        const x1 = rootRect.left + rootRect.width * 0.5;
-        // const x2 = rootBox.left + rootBox.width * 0.5;
-        // console.log(pointer.x, x1);
+        if (props.draggingOver && props.draggingOver.position !== "NONE") {
+          /**
+           * If a dropzone is already displayed for the current item, and the ....
+           */
+          if (props.draggingOver.id === props.id) {
+            const POSITION =
+              props.draggingOver.position === "AFTER" ? "BEFORE" : "AFTER";
 
-        if (
-          props.draggingOver &&
-          props.draggingOver.position !== "NONE" &&
-          props.draggingOver.id === props.id
-        ) {
-          return props.onHoverWhileDragging({
-            position:
-              props.draggingOver.position === "AFTER" ? "BEFORE" : "AFTER",
-            id: props.id,
-          });
-        }
+            debugHoverLog("TOGGLE", POSITION);
+            return addShadow(POSITION);
+          }
 
-        if (props.index < draggedItem.index) {
-          // console.log(pointer.x, rootRect.x);
-          // console.log(props.dropIndicatorPosition);
-          // if (
-          //   pointer.x > rootRect.left + rootRect.width * 0.2 &&
-          //   pointer.x < rootRect.left + rootRect.width * 1
-          // ) {
-          //   return props.onHoverWhileDragging({
-          //     position: "AFTER",
-          //     id: props.id,
-          //   });
-          // }
-          // if (props.dropIndicatorPosition === "BEFORE") {
-          //   return props.onHoverWhileDragging({
-          //     position: "AFTER",
-          //     id: props.id,
-          //   });
-          // }
-          // if (pointer.x < x1) {
-          //   console.log("one");
-          //   return props.onHoverWhileDragging({
-          //     position: "AFTER",
-          //     id: props.id as string,
-          //   });
-          // } else {
-          //   console.log("two");
-          //   return props.onHoverWhileDragging({
-          //     position: "BEFORE",
-          //     id: props.id as string,
-          //   });
-          // }
+          /**
+           * If the current inticator is AFTER the current item, the user must be moving the dragged item
+           * to the left, so we need to show the indicator before the current item.
+           */
+          if (props.draggingOver.index > props.index) {
+            debugHoverLog("MOVE", "BEFORE");
+            return addShadow("BEFORE");
+          }
+
+          /**
+           * If the current inticator is AFTER the current item, the user must be moving the dragged item
+           * to the left, so we need to show the indicator before the current item.
+           */
+          if (props.draggingOver.index < props.index) {
+            debugHoverLog("MOVE", "AFTER");
+            return addShadow("AFTER");
+          }
         }
 
         if (props.index < draggedItem.index) {
-          return props.onHoverWhileDragging({
-            position: "BEFORE",
-            id: props.id,
-          });
+          debugHoverLog("FIRST", "BEFORE");
+          return addShadow("BEFORE");
         } else {
-          console.log("else...");
-          return props.onHoverWhileDragging({
-            position: "AFTER",
-            id: props.id,
-          });
+          debugHoverLog("FIRST", "BEFORE");
+          return addShadow("AFTER");
         }
-
-        // if (props.index === 0) {
-        //   console.log(pointer.x, rootBox);
-        //   if (pointer.x < rootBox.left + rootBox.width * 0.5) {
-        //     return props.onHoverWhileDragging({
-        //       position: "BEFORE",
-        //       id: props.id,
-        //     });
-        //   }
-        // }
-
-        // In all other scenarios, put it AFTER
-
-        // if (props.index > draggedItem.index) {
-        //   if (pointer.x < x2) {
-        //     return props.onHoverWhileDragging({
-        //       position: "BEFORE",
-        //       id: props.id as string,
-        //     });
-        //   } else {
-        //     return props.onHoverWhileDragging({
-        //       position: "AFTER",
-        //       id: props.id as string,
-        //     });
-        //   }
-        // }
       },
       drop: (drag: any) => {
         // props.onDrop(drag.id, props.id);
       },
     }),
-    [props.draggedItemRect, props.dropIndicatorPosition, rootRect]
+    [
+      props.enableMoveOnHover,
+      props.draggedItemRect,
+      props.dropIndicatorPosition,
+      props.draggingOver,
+      rootRect,
+    ]
   );
-
-  // useEffect(() => {
-  //   if (dragProps.m && rootRef.current) {
-  //     props.draggedItemRef.current = rootRef.current;
-  //   }
-  // }, [dragProps.m]);
-
-  // console.log(dropProps);
 
   useEffect(() => {
     preview(getEmptyImage(), { captureDraggingState: true });
@@ -433,7 +387,7 @@ function ArtworkCard(
       return (
         <motion.div
           className={`item empty ${props.size}`}
-          style={{ background: "red" }}
+          // style={{ background: "red" }}
           layout
         />
       );
@@ -453,11 +407,9 @@ function ArtworkCard(
       initial={animationVariants.hidden}
       animate={props.isPickedUp ? "dragging" : "show"}
       onLayoutAnimationStart={() => {
-        console.log("i layout start");
         props.onLayoutAnimationStart();
       }}
       onLayoutAnimationComplete={() => {
-        console.log("i layout complete");
         props.onLayoutAnimationComplete();
       }}
       variants={animationVariants}
@@ -490,11 +442,11 @@ function ArtworkCard(
       <div
         ref={dropRef}
         style={{
-          background: dropProps.over ? "red" : "blue",
+          // background: dropProps.over ? "red" : "blue",
           position: "absolute",
           opacity: 0.2,
           inset: 0,
-          display: props.draggedItem ? "block" : "none",
+          // display: props.draggedItem ? "block" : "none",
         }}
       />
     </motion.div>
@@ -573,22 +525,6 @@ function Grid() {
               const dropIndicator = isHovered ? (
                 <motion.div
                   className={`item empty ${layer ? layer.item.size : ""}`}
-                  onLayoutAnimationStart={() => {
-                    console.log("layout start");
-                  }}
-                  onLayoutAnimationComplete={() => {
-                    console.log("layout complete");
-                  }}
-                  onAnimationStart={() => {
-                    console.log("gold start");
-                  }}
-                  onAnimationComplete={() => {
-                    console.log("gold complete");
-                  }}
-                  onAnimationEnd={() => {
-                    console.log("gold end");
-                  }}
-                  // style={{ background: "gold" }}
                   layout
                 />
               ) : null;
