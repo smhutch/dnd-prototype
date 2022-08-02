@@ -39,7 +39,7 @@ type ItemConfig = {
 };
 
 // ----
-const RATIO = [1, 0.2]; // [small, big]
+const RATIO = [1, 0]; // [small, big]
 const NUMBER_OF_ITEMS = 8;
 
 const makeItem = (size: ItemConfig["size"]): ItemConfig => ({
@@ -70,6 +70,7 @@ const Avatar = () => {
 };
 
 export const CustomDragLayer = (props: any) => {
+  // console.log(props);
   const layer = useDragLayer((monitor) => {
     return {
       item: monitor.getItem(),
@@ -197,6 +198,10 @@ export const CustomDragLayer = (props: any) => {
             ...styles,
             pointerEvents: "none",
           }}
+          animate={{ opacity: 1 }}
+          exit={{
+            opacity: 0,
+          }}
           className="item card shadow dragger"
         >
           <div
@@ -254,7 +259,9 @@ function ArtworkCard(
         username: props.username,
         size: props.size,
       },
-      end: () => props.onEndDrag(),
+      end: (e) => {
+        props.onEndDrag();
+      },
     }),
     [props.onEndDrag]
   );
@@ -357,7 +364,7 @@ function ArtworkCard(
         }
       },
       drop: (drag: any) => {
-        // props.onDrop(drag.id, props.id);
+        // We do not use on drop...
       },
     }),
     [
@@ -453,6 +460,28 @@ function ArtworkCard(
   );
 }
 
+type DropProps = {
+  onDrop: (drag: any) => void;
+  size: "small" | "big";
+};
+
+function Drop(props: DropProps) {
+  const [dropProps, dropRef] = useDrop(
+    () => ({
+      accept: [SMALL_DRAGGABLE, BIG_DRAGGABLE],
+      drop: (dragItem: any) => {
+        console.log();
+        props.onDrop(dragItem);
+      },
+    }),
+    []
+  );
+
+  return (
+    <motion.div ref={dropRef} className={`item empty ${props.size}`} layout />
+  );
+}
+
 function Grid() {
   const [items, setItems] = useState(initialItems);
   const [draggedItemRect, setDraggedItemRect] = useState<DOMRect | null>(null);
@@ -522,20 +551,29 @@ function Grid() {
                 ? draggingOver.id === item.id
                 : false;
 
-              const dropIndicator = isHovered ? (
-                <motion.div
-                  className={`item empty ${layer ? layer.item.size : ""}`}
-                  layout
-                />
-              ) : null;
-
               const dropIndicatorPosition = draggingOver
                 ? draggingOver.position
                 : "NONE";
 
+              const onDrop = (droppedItem: any) => {
+                const droppedItemIndex = droppedItem.index;
+                const droppedOnIndex = index;
+
+                if (droppedItemIndex !== -1 && droppedOnIndex !== -1) {
+                  const updatedItems = [...items];
+                  // remove dragged item from array
+                  const removedItems = updatedItems.splice(droppedItemIndex, 1);
+                  // insert dragged item at new index
+                  updatedItems.splice(droppedOnIndex, 0, removedItems[0]);
+                  setItems(updatedItems);
+                }
+              };
+
               return (
                 <Fragment key={`item-${item.id}`}>
-                  {dropIndicatorPosition === "BEFORE" && dropIndicator}
+                  {isHovered && dropIndicatorPosition === "BEFORE" && (
+                    <Drop size={layer.item?.size} onDrop={onDrop} />
+                  )}
                   {/* if item has been picked up, but is being dragged over another item, remove the source item from the grid */}
                   {isPickedUp &&
                   draggingOver &&
@@ -543,7 +581,9 @@ function Grid() {
                     <ArtworkCard
                       index={index}
                       isPickedUp={isPickedUp}
-                      onEndDrag={() => setDraggingOver(null)}
+                      onEndDrag={() => {
+                        setDraggingOver(null);
+                      }}
                       isDraggingOverDropzone={isDraggingOverDropzone}
                       isHovered={isHovered}
                       changeSize={() => changeSize(item.id)}
@@ -562,10 +602,41 @@ function Grid() {
                       draggedItemRect={draggedItemRect}
                       setDraggedItemRect={setDraggedItemRect}
                       draggingOver={draggingOver}
+                      onDrop={(droppedId: string, droppedOnId: string) => {
+                        console.log(droppedId, droppedOnId);
+                        // const droppedIndex = items.findIndex(
+                        //   ({ id }) => id === droppedId
+                        // );
+
+                        // const droppedOnIndex = items.findIndex(
+                        //   ({ id }) => id === droppedOnId
+                        // );
+
+                        // if (droppedIndex !== -1 && droppedOnIndex !== -1) {
+                        //   const updatedItems = [...items];
+                        //   // remove dragged item from array
+                        //   const removedItems = updatedItems.splice(
+                        //     droppedIndex,
+                        //     1
+                        //   );
+                        //   updatedItems.splice(
+                        //     droppedOnIndex === 0
+                        //       ? 0
+                        //       : droppedIndex > droppedOnIndex
+                        //       ? droppedOnIndex
+                        //       : droppedOnIndex - 1,
+                        //     0,
+                        //     removedItems[0]
+                        //   );
+                        //   setItems(updatedItems);
+                        // }
+                      }}
                       {...item}
                     />
                   )}
-                  {dropIndicatorPosition === "AFTER" && dropIndicator}
+                  {isHovered && dropIndicatorPosition === "AFTER" && (
+                    <Drop size={layer.item?.size} onDrop={onDrop} />
+                  )}
                 </Fragment>
               );
             })}
