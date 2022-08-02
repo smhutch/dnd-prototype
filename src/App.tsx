@@ -555,9 +555,26 @@ function Grid() {
                 ? draggingOver.position
                 : "NONE";
 
-              const onDrop = (droppedItem: any) => {
+              const onDrop = (
+                position: "BEFORE" | "AFTER",
+                droppedItem: any
+              ) => {
                 const droppedItemIndex = droppedItem.index;
                 const droppedOnIndex = index;
+
+                if (
+                  position === "AFTER" &&
+                  droppedOnIndex + 1 === droppedItemIndex
+                ) {
+                  return;
+                }
+
+                if (
+                  position === "BEFORE" &&
+                  droppedOnIndex - 1 === droppedItemIndex
+                ) {
+                  return;
+                }
 
                 if (droppedItemIndex !== -1 && droppedOnIndex !== -1) {
                   const updatedItems = [...items];
@@ -572,7 +589,10 @@ function Grid() {
               return (
                 <Fragment key={`item-${item.id}`}>
                   {isHovered && dropIndicatorPosition === "BEFORE" && (
-                    <Drop size={layer.item?.size} onDrop={onDrop} />
+                    <Drop
+                      size={layer.item?.size}
+                      onDrop={(droppedItem) => onDrop("BEFORE", droppedItem)}
+                    />
                   )}
                   {/* if item has been picked up, but is being dragged over another item, remove the source item from the grid */}
                   {isPickedUp &&
@@ -635,7 +655,10 @@ function Grid() {
                     />
                   )}
                   {isHovered && dropIndicatorPosition === "AFTER" && (
-                    <Drop size={layer.item?.size} onDrop={onDrop} />
+                    <Drop
+                      size={layer.item?.size}
+                      onDrop={(droppedItem) => onDrop("AFTER", droppedItem)}
+                    />
                   )}
                 </Fragment>
               );
