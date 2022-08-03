@@ -18,8 +18,10 @@ import { useDebounce } from "@react-hook/debounce";
 
 const chance = new Chance();
 
-const BIG_DRAGGABLE = "chonk";
-const SMALL_DRAGGABLE = "smol";
+const BIG_DRAGGABLE = "BIG";
+const SMALL_DRAGGABLE = "SMALL";
+
+type DragItemType = typeof BIG_DRAGGABLE | typeof SMALL_DRAGGABLE;
 
 let imageId = 1;
 const getImageUrl = () => {
@@ -262,11 +264,11 @@ function ArtworkCard(
   props: ItemConfig & {
     changeSize(): void;
     draggedItemRect: DOMRect | null;
-    draggingOver: any;
+    dropIndicator: any;
     dropIndicatorPosition: any;
     enableMoveOnHover: boolean;
     index: number;
-    isDraggingOverDropzone: boolean;
+    isDropIndicatorVisible: boolean;
     isHovered: boolean;
     isPickedUp: boolean;
     onEndDrag: Callback;
@@ -275,7 +277,7 @@ function ArtworkCard(
     onLayoutAnimationStart: Callback;
     remove: Callback;
     setDraggedItemRect(a: any): void;
-    draggedItem: any;
+    draggedItem: Draggable | undefined;
     draggedItemRef: any;
   }
 ) {
@@ -320,7 +322,6 @@ function ArtworkCard(
         const { draggedItemRect } = props;
         if (!props.enableMoveOnHover) return;
         if (!draggedItemRect) return;
-
         if (!rootRect) return;
 
         const pointer = monitor.getClientOffset();
@@ -360,13 +361,13 @@ function ArtworkCard(
           return addDropIndicator(POSITION);
         }
 
-        if (props.draggingOver && props.draggingOver.position !== "NONE") {
+        if (props.dropIndicator && props.dropIndicator.position) {
           /**
            * If a dropzone is already displayed for the current item, and the ....
            */
-          if (props.draggingOver.id === props.id) {
+          if (props.dropIndicator.id === props.id) {
             const POSITION =
-              props.draggingOver.position === "AFTER" ? "BEFORE" : "AFTER";
+              props.dropIndicator.position === "AFTER" ? "BEFORE" : "AFTER";
 
             debugHoverLog("TOGGLE", POSITION);
             return addDropIndicator(POSITION);
@@ -376,7 +377,7 @@ function ArtworkCard(
            * If the current inticator is AFTER the current item, the user must be moving the dragged item
            * to the left, so we need to show the indicator before the current item.
            */
-          if (props.draggingOver.index > props.index) {
+          if (props.dropIndicator.index > props.index) {
             debugHoverLog("MOVE", "BEFORE");
             return addDropIndicator("BEFORE");
           }
@@ -385,7 +386,7 @@ function ArtworkCard(
            * If the current inticator is AFTER the current item, the user must be moving the dragged item
            * to the left, so we need to show the indicator before the current item.
            */
-          if (props.draggingOver.index < props.index) {
+          if (props.dropIndicator.index < props.index) {
             debugHoverLog("MOVE", "AFTER");
             return addDropIndicator("AFTER");
           }
@@ -404,7 +405,7 @@ function ArtworkCard(
       props.enableMoveOnHover,
       props.draggedItemRect,
       props.dropIndicatorPosition,
-      props.draggingOver,
+      props.dropIndicator,
       rootRect,
     ]
   );
@@ -420,10 +421,19 @@ function ArtworkCard(
   };
 
   if (props.isPickedUp) {
-    if (props.isDraggingOverDropzone) {
+    /**
+     * When dragging over another item, remove this element from the DOM
+     */
+    if (props.isDropIndicatorVisible) {
       return null;
     } else {
-      // This is intentionally NOT a dropzone
+      /**
+       * When this item is picked up, but the user is not dragging over another item yet,
+       * show a grey box in place of the picked up item.
+       *
+       * This visually appears to be identical to a drop area, but is technically different (dropping here doesn't reorder the grid)
+       *
+       */
       return (
         <motion.div
           className={`item empty ${props.size}`}
@@ -440,21 +450,20 @@ function ArtworkCard(
       ref={mergeRefs([dragRef, rootRef])}
       className={`item card shadow ${props.size}`}
       style={{
-        transformOrigin: "top left",
         height: "100%",
       }}
-      data-size={props.size}
       initial={animationVariants.hidden}
       animate={props.isPickedUp ? "dragging" : "show"}
-      onLayoutAnimationStart={() => {
-        props.onLayoutAnimationStart();
-      }}
-      onLayoutAnimationComplete={() => {
-        props.onLayoutAnimationComplete();
-      }}
+      onLayoutAnimationStart={() => props.onLayoutAnimationStart()}
+      onLayoutAnimationComplete={() => props.onLayoutAnimationComplete()}
       variants={animationVariants}
-      draggable={true}
+      draggable
       onDragStart={() => {
+        /**
+         * When starting the drag, keep track of the initial position of the dragged item.
+         * This is later used to detect if the user is dragging over the spot they picked up
+         * this item from, to allow them to put it back down in the same spot
+         */
         if (rootRef.current) {
           props.setDraggedItemRect(rootRef.current.getBoundingClientRect());
         }
@@ -484,9 +493,10 @@ function ArtworkCard(
         style={{
           position: "absolute",
           inset: 0,
+          display: props.draggedItem ? "block" : "none",
           ...(DEBUG_MODE
             ? {
-                background: "black",
+                // background: "black",
                 opacity: 0.2,
               }
             : {}),
@@ -517,35 +527,32 @@ function Drop(props: DropProps) {
   );
 }
 
+type DragLayerProps = {
+  itemType: DragItemType | null;
+  item: Draggable;
+};
+
 function Grid() {
   const [items, setItems] = useState(initialItems);
   const [draggedItemRect, setDraggedItemRect] = useState<DOMRect | null>(null);
-  const [draggingOver, setDraggingOver] = useState<{
+  const [dropIndicator, setDropIndicator] = useState<{
     id: ItemConfig["id"];
     position: "BEFORE" | "AFTER";
   } | null>(null);
   const draggedItemRef = useRef<any>(null);
-  const [isInitialAnimationEnabled, setIsInitialAnimationEnabled] =
-    useState(false);
 
-  const layer = useDragLayer((monitor) => {
+  const layer = useDragLayer((monitor): DragLayerProps => {
     return {
-      itemType: monitor.getItemType(),
+      itemType: monitor.getItemType() as DragItemType | null,
       item: monitor.getItem(),
     };
   });
 
-  useEffect(() => {
-    if (layer.itemType && isInitialAnimationEnabled === false) {
-      setIsInitialAnimationEnabled(true);
-    }
-  }, [layer.itemType, isInitialAnimationEnabled]);
-
-  const add = (size: ItemSize, position: number) => {
-    const updatedItems = [...items];
-    updatedItems.splice(position, 0, makeItem(size));
-    setItems(updatedItems);
-  };
+  // const add = (size: ItemSize, position: number) => {
+  //   const updatedItems = [...items];
+  //   updatedItems.splice(position, 0, makeItem(size));
+  //   setItems(updatedItems);
+  // };
 
   const remove = (id: string) => {
     const index = items.findIndex((item) => item.id === id);
@@ -576,17 +583,19 @@ function Grid() {
         <div className={`grid base ${layer.itemType ? "active" : ""}`}>
           <AnimatePresence key={"item"} initial={false}>
             {items.map((item, index) => {
+              /**
+               * Is this item being dragged?
+               */
               const isPickedUp = Boolean(
                 layer.item && layer.item.id === item.id
               );
-              const isDraggingOverDropzone = Boolean(draggingOver);
-              const isHovered = draggingOver
-                ? draggingOver.id === item.id
+
+              const isDropIndicatorVisible = Boolean(dropIndicator);
+              const isHovered = dropIndicator
+                ? dropIndicator.id === item.id
                 : false;
 
-              const dropIndicatorPosition = draggingOver
-                ? draggingOver.position
-                : "NONE";
+              const dropIndicatorPosition = dropIndicator?.position;
 
               const onDrop = (
                 position: "BEFORE" | "AFTER",
@@ -621,7 +630,7 @@ function Grid() {
 
               return (
                 <Fragment key={`item-${item.id}`}>
-                  {isHovered && dropIndicatorPosition === "BEFORE" && (
+                  {isHovered && dropIndicator?.position === "BEFORE" && (
                     <Drop
                       size={layer.item?.size}
                       onDrop={(droppedItem) => onDrop("BEFORE", droppedItem)}
@@ -629,25 +638,25 @@ function Grid() {
                   )}
                   {/* if item has been picked up, but is being dragged over another item, remove the source item from the grid */}
                   {isPickedUp &&
-                  draggingOver &&
-                  draggingOver.id !== null ? null : (
+                  dropIndicator &&
+                  dropIndicator.id !== null ? null : (
                     <ArtworkCard
                       changeSize={() => changeSize(item.id)}
                       draggedItem={layer.item}
                       draggedItemRect={draggedItemRect}
                       draggedItemRef={draggedItemRef}
-                      draggingOver={draggingOver}
+                      dropIndicator={dropIndicator}
                       dropIndicatorPosition={dropIndicatorPosition}
                       enableMoveOnHover={enableMoveOnHover}
                       index={index}
-                      isDraggingOverDropzone={isDraggingOverDropzone}
+                      isDropIndicatorVisible={isDropIndicatorVisible}
                       isHovered={isHovered}
                       isPickedUp={isPickedUp}
                       onEndDrag={() => {
-                        setDraggingOver(null);
+                        setDropIndicator(null);
                       }}
                       onHoverWhileDragging={(arg) => {
-                        enableMoveOnHover && setDraggingOver(arg);
+                        enableMoveOnHover && setDropIndicator(arg);
                       }}
                       onLayoutAnimationComplete={() =>
                         setEnableMoveOnHover(true)
