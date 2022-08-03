@@ -1,7 +1,6 @@
 import {
   CSSProperties,
   Fragment,
-  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -11,17 +10,16 @@ import { HTML5Backend, getEmptyImage } from "react-dnd-html5-backend";
 import { DndProvider, useDrag, useDragLayer, useDrop } from "react-dnd";
 import { AnimatePresence, motion, MotionConfig } from "framer-motion";
 import "./styles.css";
-import { lerp } from "./helpers";
+import { debounce, lerp } from "./helpers";
 import cuid from "cuid";
 import Chance from "chance";
 import { mergeRefs } from "react-merge-refs";
+import { useDebounce } from "@react-hook/debounce";
 
 const chance = new Chance();
 
 const BIG_DRAGGABLE = "chonk";
 const SMALL_DRAGGABLE = "smol";
-
-const IMAGE_SIZE = 1200;
 
 let imageId = 1;
 const getImageUrl = () => {
@@ -31,18 +29,20 @@ const getImageUrl = () => {
   return url;
 };
 
+type ItemSize = "big" | "small";
+
 type ItemConfig = {
   id: string;
   imageUrl: string;
   username: string;
-  size: "small" | "big";
+  size: ItemSize;
 };
 
 // ----
 const RATIO = [1, 0]; // [small, big]
 const NUMBER_OF_ITEMS = 8;
 
-const makeItem = (size: ItemConfig["size"]): ItemConfig => ({
+const makeItem = (size: ItemSize): ItemConfig => ({
   id: cuid(),
   imageUrl: getImageUrl(),
   size,
@@ -192,7 +192,7 @@ export const CustomDragLayer = (props: any) => {
 
   return (
     <AnimatePresence initial={false}>
-      {layer.isDragging && (
+      {layer.item && (
         <motion.div
           style={{
             ...styles,
@@ -201,6 +201,12 @@ export const CustomDragLayer = (props: any) => {
           animate={{ opacity: 1 }}
           exit={{
             opacity: 0,
+          }}
+          transition={{
+            type: "spring",
+            damping: 12,
+            mass: 0.2,
+            stiffness: 150,
           }}
           className="item card shadow dragger"
         >
@@ -222,11 +228,30 @@ export const CustomDragLayer = (props: any) => {
 
 const DEBUG_MODE = true as boolean;
 
+type DropIndicatorPosition = "BEFORE" | "AFTER";
+
 type DebugLogOption = {
   draggedIndex: number;
   hoveringOverIndex: number;
-  position: "BEFORE" | "AFTER";
+  position: DropIndicatorPosition;
 };
+
+type Draggable = {
+  index: number;
+  id: string;
+  imageUrl: string;
+  username: string;
+  size: ItemSize;
+};
+
+type OnDragHoverOption = {
+  id: Draggable["id"];
+  position: DropIndicatorPosition;
+  index: Draggable["index"];
+};
+
+type Callback = () => void;
+type OnDragHover = (draggedOverOption: OnDragHoverOption) => void;
 
 const debugLog = (message: string, options: DebugLogOption) => {
   if (!DEBUG_MODE) return;
@@ -236,12 +261,23 @@ const debugLog = (message: string, options: DebugLogOption) => {
 function ArtworkCard(
   props: ItemConfig & {
     changeSize(): void;
-    remove(): void;
+    draggedItemRect: DOMRect | null;
+    draggingOver: any;
+    dropIndicatorPosition: any;
+    enableMoveOnHover: boolean;
+    index: number;
+    isDraggingOverDropzone: boolean;
     isHovered: boolean;
     isPickedUp: boolean;
-    onEndDrag(): void;
-    draggedItemRect: DOMRect | null;
-  } & any
+    onEndDrag: Callback;
+    onHoverWhileDragging: OnDragHover;
+    onLayoutAnimationComplete: Callback;
+    onLayoutAnimationStart: Callback;
+    remove: Callback;
+    setDraggedItemRect(a: any): void;
+    draggedItem: any;
+    draggedItemRef: any;
+  }
 ) {
   const rootRef = useRef<HTMLDivElement>(null);
 
@@ -249,7 +285,7 @@ function ArtworkCard(
     ? rootRef.current.getBoundingClientRect()
     : null;
 
-  const [_dragProps, dragRef, preview] = useDrag(
+  const [_dragProps, dragRef, preview] = useDrag<Draggable>(
     () => ({
       type: props.size === "small" ? SMALL_DRAGGABLE : BIG_DRAGGABLE,
       item: {
@@ -259,14 +295,14 @@ function ArtworkCard(
         username: props.username,
         size: props.size,
       },
-      end: (e) => {
+      end: () => {
         props.onEndDrag();
       },
     }),
     [props.onEndDrag]
   );
 
-  const [_dropProps, dropRef] = useDrop(
+  const [dropProps, dropRef] = useDrop<Draggable, unknown, { over: boolean }>(
     () => ({
       accept:
         props.size === "big"
@@ -292,7 +328,7 @@ function ArtworkCard(
         const sourcePosition = monitor.getInitialSourceClientOffset();
         const initialPointer = monitor.getInitialClientOffset();
 
-        const addShadow = (position: "BEFORE" | "AFTER") => {
+        const addDropIndicator = (position: "BEFORE" | "AFTER") => {
           return props.onHoverWhileDragging({
             position,
             id: props.id,
@@ -321,7 +357,7 @@ function ArtworkCard(
         ) {
           const POSITION = props.index > draggedItem.index ? "BEFORE" : "AFTER";
           debugHoverLog("INITIAL", POSITION);
-          return addShadow(POSITION);
+          return addDropIndicator(POSITION);
         }
 
         if (props.draggingOver && props.draggingOver.position !== "NONE") {
@@ -333,7 +369,7 @@ function ArtworkCard(
               props.draggingOver.position === "AFTER" ? "BEFORE" : "AFTER";
 
             debugHoverLog("TOGGLE", POSITION);
-            return addShadow(POSITION);
+            return addDropIndicator(POSITION);
           }
 
           /**
@@ -342,7 +378,7 @@ function ArtworkCard(
            */
           if (props.draggingOver.index > props.index) {
             debugHoverLog("MOVE", "BEFORE");
-            return addShadow("BEFORE");
+            return addDropIndicator("BEFORE");
           }
 
           /**
@@ -351,20 +387,17 @@ function ArtworkCard(
            */
           if (props.draggingOver.index < props.index) {
             debugHoverLog("MOVE", "AFTER");
-            return addShadow("AFTER");
+            return addDropIndicator("AFTER");
           }
         }
 
         if (props.index < draggedItem.index) {
           debugHoverLog("FIRST", "BEFORE");
-          return addShadow("BEFORE");
+          return addDropIndicator("BEFORE");
         } else {
           debugHoverLog("FIRST", "BEFORE");
-          return addShadow("AFTER");
+          return addDropIndicator("AFTER");
         }
-      },
-      drop: (drag: any) => {
-        // We do not use on drop...
       },
     }),
     [
@@ -449,11 +482,14 @@ function ArtworkCard(
       <div
         ref={dropRef}
         style={{
-          // background: dropProps.over ? "red" : "blue",
           position: "absolute",
-          opacity: 0.2,
           inset: 0,
-          // display: props.draggedItem ? "block" : "none",
+          ...(DEBUG_MODE
+            ? {
+                background: "black",
+                opacity: 0.2,
+              }
+            : {}),
         }}
       />
     </motion.div>
@@ -461,16 +497,15 @@ function ArtworkCard(
 }
 
 type DropProps = {
-  onDrop: (drag: any) => void;
-  size: "small" | "big";
+  onDrop: (drag: Draggable) => void;
+  size: ItemSize;
 };
 
 function Drop(props: DropProps) {
-  const [dropProps, dropRef] = useDrop(
+  const [_dropProps, dropRef] = useDrop<Draggable>(
     () => ({
       accept: [SMALL_DRAGGABLE, BIG_DRAGGABLE],
-      drop: (dragItem: any) => {
-        console.log();
+      drop: (dragItem) => {
         props.onDrop(dragItem);
       },
     }),
@@ -493,8 +528,6 @@ function Grid() {
   const [isInitialAnimationEnabled, setIsInitialAnimationEnabled] =
     useState(false);
 
-  // console.log(draggedItemRef);
-
   const layer = useDragLayer((monitor) => {
     return {
       itemType: monitor.getItemType(),
@@ -508,7 +541,7 @@ function Grid() {
     }
   }, [layer.itemType, isInitialAnimationEnabled]);
 
-  const add = (size: "small" | "big", position: number) => {
+  const add = (size: ItemSize, position: number) => {
     const updatedItems = [...items];
     updatedItems.splice(position, 0, makeItem(size));
     setItems(updatedItems);
@@ -557,7 +590,7 @@ function Grid() {
 
               const onDrop = (
                 position: "BEFORE" | "AFTER",
-                droppedItem: any
+                droppedItem: Draggable
               ) => {
                 const droppedItemIndex = droppedItem.index;
                 const droppedOnIndex = index;
@@ -599,58 +632,29 @@ function Grid() {
                   draggingOver &&
                   draggingOver.id !== null ? null : (
                     <ArtworkCard
+                      changeSize={() => changeSize(item.id)}
+                      draggedItem={layer.item}
+                      draggedItemRect={draggedItemRect}
+                      draggedItemRef={draggedItemRef}
+                      draggingOver={draggingOver}
+                      dropIndicatorPosition={dropIndicatorPosition}
+                      enableMoveOnHover={enableMoveOnHover}
                       index={index}
+                      isDraggingOverDropzone={isDraggingOverDropzone}
+                      isHovered={isHovered}
                       isPickedUp={isPickedUp}
                       onEndDrag={() => {
                         setDraggingOver(null);
                       }}
-                      isDraggingOverDropzone={isDraggingOverDropzone}
-                      isHovered={isHovered}
-                      changeSize={() => changeSize(item.id)}
-                      remove={() => remove(item.id)}
-                      draggedItem={layer.item}
+                      onHoverWhileDragging={(arg) => {
+                        enableMoveOnHover && setDraggingOver(arg);
+                      }}
                       onLayoutAnimationComplete={() =>
                         setEnableMoveOnHover(true)
                       }
-                      dropIndicatorPosition={dropIndicatorPosition}
                       onLayoutAnimationStart={() => setEnableMoveOnHover(false)}
-                      onHoverWhileDragging={(arg: any) => {
-                        enableMoveOnHover && setDraggingOver(arg);
-                      }}
-                      enableMoveOnHover={enableMoveOnHover}
-                      draggedItemRef={draggedItemRef}
-                      draggedItemRect={draggedItemRect}
+                      remove={() => remove(item.id)}
                       setDraggedItemRect={setDraggedItemRect}
-                      draggingOver={draggingOver}
-                      onDrop={(droppedId: string, droppedOnId: string) => {
-                        console.log(droppedId, droppedOnId);
-                        // const droppedIndex = items.findIndex(
-                        //   ({ id }) => id === droppedId
-                        // );
-
-                        // const droppedOnIndex = items.findIndex(
-                        //   ({ id }) => id === droppedOnId
-                        // );
-
-                        // if (droppedIndex !== -1 && droppedOnIndex !== -1) {
-                        //   const updatedItems = [...items];
-                        //   // remove dragged item from array
-                        //   const removedItems = updatedItems.splice(
-                        //     droppedIndex,
-                        //     1
-                        //   );
-                        //   updatedItems.splice(
-                        //     droppedOnIndex === 0
-                        //       ? 0
-                        //       : droppedIndex > droppedOnIndex
-                        //       ? droppedOnIndex
-                        //       : droppedOnIndex - 1,
-                        //     0,
-                        //     removedItems[0]
-                        //   );
-                        //   setItems(updatedItems);
-                        // }
-                      }}
                       {...item}
                     />
                   )}
