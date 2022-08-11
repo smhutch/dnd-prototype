@@ -10,7 +10,7 @@ import { HTML5Backend, getEmptyImage } from "react-dnd-html5-backend";
 import { DndProvider, useDrag, useDragLayer, useDrop } from "react-dnd";
 import { AnimatePresence, motion, MotionConfig } from "framer-motion";
 import "./styles.css";
-import { debounce, lerp } from "./helpers";
+import { lerp } from "./helpers";
 import cuid from "cuid";
 import Chance from "chance";
 import { mergeRefs } from "react-merge-refs";
