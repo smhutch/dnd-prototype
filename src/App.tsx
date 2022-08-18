@@ -1,6 +1,7 @@
 import {
   CSSProperties,
   Fragment,
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -21,7 +22,7 @@ const chance = new Chance();
 const BIG_DRAGGABLE = "BIG";
 const SMALL_DRAGGABLE = "SMALL";
 
-type DragItemType = typeof BIG_DRAGGABLE | typeof SMALL_DRAGGABLE;
+type DraggedItemType = typeof BIG_DRAGGABLE | typeof SMALL_DRAGGABLE;
 
 let imageId = 1;
 const getImageUrl = () => {
@@ -42,7 +43,7 @@ type ItemConfig = {
 
 // ----
 const RATIO = [1, 0]; // [small, big]
-const NUMBER_OF_ITEMS = 8;
+const NUMBER_OF_ITEMS = 24;
 
 const makeItem = (size: ItemSize): ItemConfig => ({
   id: cuid(),
@@ -51,9 +52,16 @@ const makeItem = (size: ItemSize): ItemConfig => ({
   username: "@adam",
 });
 
-const initialItems = Array.from({ length: NUMBER_OF_ITEMS })
-  .map((_): ItemConfig => makeItem(chance.weighted(["small", "big"], RATIO)))
-  .reverse();
+const initialItems = Array.from({ length: NUMBER_OF_ITEMS }).map(
+  (_, index): ItemConfig => {
+    if (index === 0) {
+      return makeItem("big");
+    }
+
+    return makeItem(chance.weighted(["small", "big"], RATIO));
+  }
+);
+// .reverse();
 
 const getDraggableId = (id: string) => `draggable-${id}`;
 
@@ -246,11 +254,15 @@ type Draggable = {
   size: ItemSize;
 };
 
-type OnDragHoverOption = {
-  id: Draggable["id"];
-  position: DropIndicatorPosition;
-  index: Draggable["index"];
-};
+type OnDragHoverOption =
+  | {
+      position: DropIndicatorPosition;
+      index: Draggable["index"];
+    }
+  | {
+      position: DropIndicatorPosition;
+      id: Draggable["id"];
+    };
 
 type Callback = () => void;
 type OnDragHover = (draggedOverOption: OnDragHoverOption) => void;
@@ -267,6 +279,7 @@ function ArtworkCard(
     dropIndicator: any;
     dropIndicatorPosition: any;
     enableMoveOnHover: boolean;
+    gridRect: DOMRect | null;
     index: number;
     isDropIndicatorVisible: boolean;
     isHovered: boolean;
@@ -306,36 +319,27 @@ function ArtworkCard(
 
   const [dropProps, dropRef] = useDrop<Draggable, unknown, { over: boolean }>(
     () => ({
-      accept:
-        props.size === "big"
-          ? [BIG_DRAGGABLE]
-          : [SMALL_DRAGGABLE, BIG_DRAGGABLE],
+      accept: [SMALL_DRAGGABLE, BIG_DRAGGABLE],
       collect: (monitor) => {
         return {
           over: monitor.isOver(),
         };
       },
       canDrop: () => {
-        return props.enableMoveOnHover && props.size !== "big";
+        return props.enableMoveOnHover;
       },
       hover: (draggedItem, monitor) => {
-        const { draggedItemRect } = props;
+        const { draggedItemRect, gridRect } = props;
+
         if (!props.enableMoveOnHover) return;
         if (!draggedItemRect) return;
         if (!rootRect) return;
 
+        const id = props.id;
         const pointer = monitor.getClientOffset();
 
         const sourcePosition = monitor.getInitialSourceClientOffset();
         const initialPointer = monitor.getInitialClientOffset();
-
-        const addDropIndicator = (position: "BEFORE" | "AFTER") => {
-          return props.onHoverWhileDragging({
-            position,
-            id: props.id,
-            index: props.index,
-          });
-        };
 
         const debugHoverLog = (message: string, position: "BEFORE" | "AFTER") =>
           debugLog(message, {
@@ -344,7 +348,82 @@ function ArtworkCard(
             position,
           });
 
-        if (!pointer || !initialPointer || !sourcePosition) return;
+        if (!pointer || !initialPointer || !sourcePosition || !gridRect) return;
+
+        if (props.size === "big") {
+          // const centerX = rootRect.left + rootRect.width / 2;
+          // const centerY = rootRect.top + rootRect.height / 2;
+          // const half = pointer.x < centerX ? "left" : "right";
+          // const side = pointer.y < centerY ? "top" : "bottom";
+
+          // if (pointer.x < initialPointer.x) {
+          //   if (half === "left" && side === "top") {
+          //     return props.onHoverWhileDragging({
+          //       position: "BEFORE",
+          //       index: props.index,
+          //     });
+          //   }
+          //   return;
+          // }
+
+          // if (pointer.x > initialPointer.x) {
+          //   if (half === "right" && side === "top") {
+          //     return props.onHoverWhileDragging({
+          //       position: "AFTER",
+          //       index: props.index,
+          //     });
+          //   }
+          //   return;
+          // }
+
+          return;
+        }
+
+        if (draggedItem.size === "big") {
+          // if (draggedItem.index < props.index) {
+          //   console.log("edge case...");
+          // }
+          // const draggedItemCenterX =
+          //   draggedItemRect.left + draggedItemRect.width / 2;
+          // const draggedItemCenterY =
+          //   draggedItemRect.top + draggedItemRect.height / 2;
+          // const centerX = rootRect.left + rootRect.width / 2;
+          // const centerY = rootRect.top + rootRect.height / 2;
+          // console.log(
+          //   draggedItemRect.top,
+          //   draggedItemRect.bottom,
+          //   rootRect.top
+          // );
+          // const draggedItemMiddleY =
+          //   draggedItemRect.top + draggedItemRect.height / 2;
+          // console.log(
+          //   rootRect.bottom <= draggedItemRect.bottom,
+          //   rootRect.bottom,
+          //   draggedItemRect.bottom,
+          //   Math.ceil(draggedItemRect.bottom)
+          // );
+          // /**
+          //  * If the user is dragging a LARGE item horizontally,
+          //  * and they are hovering over a SMALL item in the bottom half of the original position
+          //  */
+          // if (
+          //   rootRect.top > draggedItemMiddleY &&
+          //   Math.ceil(rootRect.bottom) <= Math.ceil(draggedItemRect.bottom)
+          // ) {
+          //   /**
+          //    * If the user is dragging to the right
+          //    */
+          //   if (pointer.x > initialPointer.x) {
+          //     return props.onHoverWhileDragging({
+          //       position: "BEFORE",
+          //       index: props.index - 1,
+          //     });
+          //   } else {
+          //     // return props.onHoverWhileDragging({
+          //     // })
+          //   }
+          // }
+        }
 
         /**
          * Check if user is dragging over the INITIAL position of the dragged item
@@ -358,7 +437,50 @@ function ArtworkCard(
         ) {
           const POSITION = props.index > draggedItem.index ? "BEFORE" : "AFTER";
           debugHoverLog("INITIAL", POSITION);
-          return addDropIndicator(POSITION);
+          return props.onHoverWhileDragging({ position: POSITION, id });
+        }
+
+        if (draggedItem.size === "big") {
+          /**
+           * When dropzone is touching the right side, there is no space
+           * for the user to drop the item in that position. To account for this,
+           * we need to handle this case separately.
+           */
+          const isDropzoneTouchingRightEdge =
+            Math.ceil(rootRect.right) === Math.ceil(gridRect.right);
+
+          if (props.index < draggedItem.index) {
+            /**
+             * When moving a LARGE item upwards, and hovering over the item at the right side,
+             * assume that the user wants the right side of the large item to be in this position.
+             *
+             * With this assumption in place, we can drop the large item in the space ONE to the left.
+             */
+            if (isDropzoneTouchingRightEdge) {
+              return props.onHoverWhileDragging({
+                position: "BEFORE",
+                index: props.index - 1,
+              });
+            }
+
+            debugHoverLog("FIRST", "BEFORE");
+            return props.onHoverWhileDragging({ position: "BEFORE", id });
+          } else {
+            console.log(props.index - draggedItem.index);
+
+            if (props.index - draggedItem.index <= 2) {
+              return props.onHoverWhileDragging({
+                position: "AFTER",
+                index: props.index,
+              });
+            }
+
+            debugHoverLog("FIRST", "AFTER");
+            return props.onHoverWhileDragging({
+              position: "AFTER",
+              index: props.index - 2,
+            });
+          }
         }
 
         if (props.dropIndicator && props.dropIndicator.position) {
@@ -370,7 +492,7 @@ function ArtworkCard(
               props.dropIndicator.position === "AFTER" ? "BEFORE" : "AFTER";
 
             debugHoverLog("TOGGLE", POSITION);
-            return addDropIndicator(POSITION);
+            return props.onHoverWhileDragging({ position: POSITION, index: 7 });
           }
 
           /**
@@ -379,7 +501,7 @@ function ArtworkCard(
            */
           if (props.dropIndicator.index > props.index) {
             debugHoverLog("MOVE", "BEFORE");
-            return addDropIndicator("BEFORE");
+            return props.onHoverWhileDragging({ position: "BEFORE", id });
           }
 
           /**
@@ -388,16 +510,16 @@ function ArtworkCard(
            */
           if (props.dropIndicator.index < props.index) {
             debugHoverLog("MOVE", "AFTER");
-            return addDropIndicator("AFTER");
+            return props.onHoverWhileDragging({ position: "AFTER", id });
           }
         }
 
         if (props.index < draggedItem.index) {
           debugHoverLog("FIRST", "BEFORE");
-          return addDropIndicator("BEFORE");
+          return props.onHoverWhileDragging({ position: "BEFORE", id });
         } else {
-          debugHoverLog("FIRST", "BEFORE");
-          return addDropIndicator("AFTER");
+          debugHoverLog("FIRST", "AFTER");
+          return props.onHoverWhileDragging({ position: "AFTER", id });
         }
       },
     }),
@@ -528,7 +650,7 @@ function Drop(props: DropProps) {
 }
 
 type DragLayerProps = {
-  itemType: DragItemType | null;
+  itemType: DraggedItemType | null;
   item: Draggable;
 };
 
@@ -543,7 +665,7 @@ function Grid() {
 
   const layer = useDragLayer((monitor): DragLayerProps => {
     return {
-      itemType: monitor.getItemType() as DragItemType | null,
+      itemType: monitor.getItemType() as DraggedItemType | null,
       item: monitor.getItem(),
     };
   });
@@ -573,6 +695,13 @@ function Grid() {
     }
   };
 
+  const gridRectRef = useRef<DOMRect | null>(null);
+
+  const getGridRect = useCallback((el: HTMLDivElement | null) => {
+    if (!el) return;
+    gridRectRef.current = el.getBoundingClientRect();
+  }, []);
+
   const [enableMoveOnHover, setEnableMoveOnHover] = useState(true);
 
   return (
@@ -580,7 +709,10 @@ function Grid() {
       transition={{ type: "spring", damping: 12, mass: 0.2, stiffness: 150 }}
     >
       <div className="root container">
-        <div className={`grid base ${layer.itemType ? "active" : ""}`}>
+        <div
+          ref={getGridRect}
+          className={`grid base ${layer.itemType ? "active" : ""}`}
+        >
           <AnimatePresence key={"item"} initial={false}>
             {items.map((item, index) => {
               /**
@@ -598,32 +730,41 @@ function Grid() {
               const dropIndicatorPosition = dropIndicator?.position;
 
               const onDrop = (
-                position: "BEFORE" | "AFTER",
-                droppedItem: Draggable
+                dropPosition: "BEFORE" | "AFTER",
+                draggedItem: Draggable
               ) => {
-                const droppedItemIndex = droppedItem.index;
-                const droppedOnIndex = index;
+                /**
+                 * Original index of the dragged item.
+                 */
+                const draggedIndex = draggedItem.index;
+                /**
+                 * Index of the item that the user dragged over, to reveal a drop area.
+                 */
+                const droppedIndex = index;
+
+                const isOneAfter = draggedIndex === index + 1;
+                const isOneBefore = draggedIndex === index - 1;
 
                 if (
-                  position === "AFTER" &&
-                  droppedOnIndex + 1 === droppedItemIndex
+                  (dropPosition === "AFTER" && isOneAfter) ||
+                  (dropPosition === "BEFORE" && isOneBefore)
                 ) {
+                  // No need to mutate, the item is already in the correct position
                   return;
                 }
 
-                if (
-                  position === "BEFORE" &&
-                  droppedOnIndex - 1 === droppedItemIndex
-                ) {
-                  return;
-                }
+                if (draggedIndex !== -1) {
+                  const position = getDropPosition({
+                    dropPosition,
+                    draggedIndex,
+                    droppedIndex,
+                  });
 
-                if (droppedItemIndex !== -1 && droppedOnIndex !== -1) {
                   const updatedItems = [...items];
                   // remove dragged item from array
-                  const removedItems = updatedItems.splice(droppedItemIndex, 1);
+                  const removedItems = updatedItems.splice(draggedIndex, 1);
                   // insert dragged item at new index
-                  updatedItems.splice(droppedOnIndex, 0, removedItems[0]);
+                  updatedItems.splice(position, 0, removedItems[0]);
                   setItems(updatedItems);
                 }
               };
@@ -648,6 +789,7 @@ function Grid() {
                       dropIndicator={dropIndicator}
                       dropIndicatorPosition={dropIndicatorPosition}
                       enableMoveOnHover={enableMoveOnHover}
+                      gridRect={gridRectRef.current}
                       index={index}
                       isDropIndicatorVisible={isDropIndicatorVisible}
                       isHovered={isHovered}
@@ -656,7 +798,23 @@ function Grid() {
                         setDropIndicator(null);
                       }}
                       onHoverWhileDragging={(arg) => {
-                        enableMoveOnHover && setDropIndicator(arg);
+                        if (!enableMoveOnHover) return;
+
+                        if ("id" in arg) {
+                          setDropIndicator(arg);
+                        }
+
+                        if ("index" in arg) {
+                          const item = items[arg.index];
+                          if (!item) return;
+
+                          const id = item.id;
+
+                          setDropIndicator({
+                            id,
+                            position: arg.position,
+                          });
+                        }
                       }}
                       onLayoutAnimationComplete={() =>
                         setEnableMoveOnHover(true)
@@ -691,3 +849,78 @@ export default function App() {
     </DndProvider>
   );
 }
+
+type GetDropPositionOptions = {
+  /** Does the user want to drop the item before or after the item they hovered over? */
+  dropPosition: "BEFORE" | "AFTER";
+  /** The index of the item that the user hovered over while dragging */
+  droppedIndex: number;
+  /** The original index of the dragged item */
+  draggedIndex: number;
+};
+
+export const getDropPosition = (options: GetDropPositionOptions): number => {
+  const { dropPosition, droppedIndex, draggedIndex } = options;
+
+  /** Is the dragged item being moved to a new index that is greater than the current position? */
+  const isMovingToLargerIndex = droppedIndex > draggedIndex;
+
+  if (isMovingToLargerIndex) {
+    /**
+     * When dragging an item to a larger index, the dropPosition is initially 'AFTER' the item.
+     *
+     * ⧅ = drop indicator
+     * 0 = index in grid
+     *
+     * Initial (about to drag item 0):
+     * 0 1 2 3
+     * 4 5 6 7
+     *
+     * While dragging item 0 over item 2:
+     * 1 2 ⧅ 3
+     * 4 5 6 7
+     *
+     * While dragging item 5 over item 7:
+     * 0 1 2 3
+     * 4 6 7 ⧅
+     *
+     * The dropPosition will become 'BEFORE' in scenarios where the user dragged over an item for a second time.
+     * They initially saw a drop indicator `AFTER` the item, but then changed their mind, and dragged over the item again,
+     * causing the drop indicator to move `BEFORE` the item.
+     *
+     * While dragging item 0 over item 2 a second time:
+     * 1 ⧅ 2 3
+     * 4 5 6 7
+     *
+     * While dragging item 5 over item 7 a second time:
+     * 0 1 2 3
+     * 4 6 ⧅ 7
+     */
+    return dropPosition === "AFTER" ? droppedIndex : droppedIndex - 1;
+  }
+
+  /**
+   * In this scenario, the dragged item is being moved to a smaller index.
+   * The drop indicator will initially have a position `BEFORE` the item.
+   *
+   * While dragging item 3 over item 1:
+   * 0 ⧅ 1 2
+   * 4 5 6 7
+   *
+   * While dragging item 4 over item 2:
+   * 0 1 ⧅ 2
+   * 3 4 6 7
+   *
+   * The dropPosition will become 'AFTER' in scenarios where the user dragged over an item for a second time.
+   * This is essentially the opposite logic to the above scenario.
+   *
+   * While dragging item 3 over item 1 a second time:
+   * 0 1 ⧅ 2
+   * 4 5 6 7
+   *
+   * While dragging item 4 over item 2 a second time:
+   * 0 1 2 ⧅
+   * 3 4 6 7
+   */
+  return dropPosition === "AFTER" ? droppedIndex + 1 : droppedIndex;
+};
